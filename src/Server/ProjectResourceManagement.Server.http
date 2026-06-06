@@ -1,0 +1,6 @@
+@ProjectResourceManagement.Server_HostAddress = http://localhost:5071
+
+GET {{ProjectResourceManagement.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
