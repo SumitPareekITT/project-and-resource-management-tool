@@ -22,11 +22,11 @@ public sealed class EmployeesController(EmployeeAdminService employeeAdminServic
     public async Task<IActionResult> CreateAsync([FromBody] CreateEmployeeProfileRequest request, CancellationToken cancellationToken)
     {
         var result = await employeeAdminService.CreateEmployeeAsync(request, cancellationToken);
-        return ToActionResult(result, createdAtRouteName: nameof(GetByIdAsync), routeValues: new { employeeId = result.Value?.EmployeeId });
+        return ToActionResult(result, createdAtRouteName: nameof(GetEmployeeByIdAsync), routeValues: new { employeeId = result.Value?.EmployeeId });
     }
 
-    [HttpGet("{employeeId:int}", Name = nameof(GetByIdAsync))]
-    public async Task<IActionResult> GetByIdAsync(int employeeId, CancellationToken cancellationToken)
+    [HttpGet("{employeeId:int}", Name = nameof(GetEmployeeByIdAsync))]
+    public async Task<IActionResult> GetEmployeeByIdAsync(int employeeId, CancellationToken cancellationToken)
     {
         var employees = await employeeAdminService.ListEmployeesAsync(cancellationToken);
         var employee = employees.Value?.FirstOrDefault(item => item.EmployeeId == employeeId);

@@ -17,6 +17,7 @@ public sealed class ProjectRepository(ApplicationDbContext dbContext)
     {
         return dbContext.Projects
             .Include(project => project.Manager)
+            .Include(project => project.Milestones)
             .OrderBy(project => project.Name)
             .ToListAsync(cancellationToken);
     }

@@ -27,3 +27,61 @@ X-User-Role: Admin
 Accept: application/json
 
 ###
+
+POST {{ProjectResourceManagement.Server_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin@1234"
+}
+
+###
+
+GET {{ProjectResourceManagement.Server_HostAddress}}/api/users
+X-User-Role: Admin
+Accept: application/json
+
+###
+
+POST {{ProjectResourceManagement.Server_HostAddress}}/api/users
+X-User-Role: Admin
+Content-Type: application/json
+
+{
+  "fullName": "Manager Demo",
+  "email": "manager.demo@techserve.local",
+  "username": "manager.demo",
+  "temporaryPassword": "Temp@1234",
+  "role": "Manager"
+}
+
+###
+
+GET {{ProjectResourceManagement.Server_HostAddress}}/api/projects
+X-User-Role: Admin
+Accept: application/json
+
+###
+
+POST {{ProjectResourceManagement.Server_HostAddress}}/api/projects
+X-User-Role: Admin
+Content-Type: application/json
+
+{
+  "name": "Apollo",
+  "clientName": "Acme Corp",
+  "description": "Core platform",
+  "startDate": "2026-06-07",
+  "endDate": "2026-12-31",
+  "managerId": 2,
+  "totalStoryPoints": 120
+}
+
+###
+
+GET {{ProjectResourceManagement.Server_HostAddress}}/api/allocations/matrix
+X-User-Role: Admin
+Accept: application/json
+
+###
