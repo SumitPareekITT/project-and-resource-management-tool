@@ -32,6 +32,18 @@ public sealed class AllocationRepository(ApplicationDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<Allocation>> ListAllActiveAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Allocations
+            .Include(allocation => allocation.Employee)
+            .Include(allocation => allocation.Project)
+            .ThenInclude(project => project.Manager)
+            .Where(allocation => allocation.Status == AllocationStatus.Active)
+            .OrderBy(allocation => allocation.Project.Name)
+            .ThenBy(allocation => allocation.Employee.FullName)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Allocation allocation, CancellationToken cancellationToken = default)
     {
         await dbContext.Allocations.AddAsync(allocation, cancellationToken);

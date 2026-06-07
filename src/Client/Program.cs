@@ -1,9 +1,11 @@
 using System.Net.Http.Json;
-using System.Text.Json;
-using ProjectResourceManagement.Shared.DTOs.Admin;
+using ProjectResourceManagement.Client;
+using ProjectResourceManagement.Shared.DTOs.Auth;
 using ProjectResourceManagement.Shared.Enums;
 
-Console.WriteLine("Project & Resource Management Tool");
+Console.WriteLine("==============================================");
+Console.WriteLine("   Project & Resource Management Tool");
+Console.WriteLine("==============================================");
 Console.Write("Server URL (default http://localhost:5071): ");
 var serverUrl = Console.ReadLine();
 if (string.IsNullOrWhiteSpace(serverUrl))
@@ -15,108 +17,84 @@ using var httpClient = new HttpClient
 {
     BaseAddress = new Uri(serverUrl)
 };
-httpClient.DefaultRequestHeaders.Add("X-User-Role", "Admin");
 
-await RunDay4AdminMenuAsync(httpClient);
-
-static async Task RunDay4AdminMenuAsync(HttpClient client)
+var session = await LoginAsync(httpClient);
+if (session is null)
 {
-    while (true)
+    return;
+}
+
+if (session.ForcePasswordChange)
+{
+    var changed = await ChangePasswordAsync(httpClient, session);
+    if (!changed)
     {
-        Console.WriteLine();
-        Console.WriteLine("Day 4 Admin Test Menu");
-        Console.WriteLine("1. Health check");
-        Console.WriteLine("2. List skills");
-        Console.WriteLine("3. Create skill");
-        Console.WriteLine("4. List employees");
-        Console.WriteLine("0. Exit");
-        Console.Write("Choose option: ");
-
-        var option = Console.ReadLine()?.Trim();
-        Console.WriteLine();
-
-        switch (option)
-        {
-            case "1":
-                await HealthCheckAsync(client);
-                break;
-            case "2":
-                await ListSkillsAsync(client);
-                break;
-            case "3":
-                await CreateSkillAsync(client);
-                break;
-            case "4":
-                await ListEmployeesAsync(client);
-                break;
-            case "0":
-                return;
-            default:
-                Console.WriteLine("Invalid option.");
-                break;
-        }
-    }
-}
-
-static async Task HealthCheckAsync(HttpClient client)
-{
-    var response = await client.GetAsync("/health");
-    await PrintResponseAsync(response);
-}
-
-static async Task ListSkillsAsync(HttpClient client)
-{
-    var response = await client.GetAsync("/api/skills");
-    await PrintResponseAsync(response);
-}
-
-static async Task CreateSkillAsync(HttpClient client)
-{
-    Console.Write("Skill name: ");
-    var name = Console.ReadLine() ?? string.Empty;
-
-    Console.WriteLine("Category options: Backend, Frontend, DevOps, QA, Other");
-    Console.Write("Category: ");
-    var categoryRaw = Console.ReadLine();
-    if (!Enum.TryParse<SkillCategory>(categoryRaw, ignoreCase: true, out var category))
-    {
-        Console.WriteLine("Invalid category.");
         return;
     }
-
-    var payload = new UpsertSkillRequest(name, category);
-    var response = await client.PostAsJsonAsync("/api/skills", payload);
-    await PrintResponseAsync(response);
 }
 
-static async Task ListEmployeesAsync(HttpClient client)
+httpClient.DefaultRequestHeaders.Remove("X-User-Role");
+httpClient.DefaultRequestHeaders.Add("X-User-Role", session.Role.ToString());
+
+switch (session.Role)
 {
-    var response = await client.GetAsync("/api/employees");
-    await PrintResponseAsync(response);
+    case UserRole.Admin:
+        await AdminMenu.RunAsync(httpClient, session);
+        break;
+    case UserRole.Manager:
+        await ManagerMenu.RunAsync(httpClient, session);
+        break;
+    case UserRole.Employee:
+        await EmployeeMenu.RunAsync(httpClient, session);
+        break;
+    default:
+        Console.WriteLine("Unsupported role.");
+        break;
 }
 
-static async Task PrintResponseAsync(HttpResponseMessage response)
+static async Task<LoginResponse?> LoginAsync(HttpClient client)
 {
-    var content = await response.Content.ReadAsStringAsync();
-    Console.WriteLine($"Status: {(int)response.StatusCode} {response.StatusCode}");
+    Console.WriteLine();
+    Console.Write("Username: ");
+    var username = Console.ReadLine() ?? string.Empty;
+    Console.Write("Password: ");
+    var password = Console.ReadLine() ?? string.Empty;
 
-    if (string.IsNullOrWhiteSpace(content))
+    var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
+    if (!await ApiHelper.EnsureSuccessAsync(response))
     {
-        Console.WriteLine("(empty body)");
-        return;
+        return null;
     }
 
-    try
+    var login = await ApiHelper.ReadAsync<LoginResponse>(response);
+    if (login is null)
     {
-        using var document = JsonDocument.Parse(content);
-        var pretty = JsonSerializer.Serialize(document, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
-        Console.WriteLine(pretty);
+        Console.WriteLine("Login response was empty.");
+        return null;
     }
-    catch
+
+    Console.WriteLine($"Login successful. Role: {login.Role}");
+    return login;
+}
+
+static async Task<bool> ChangePasswordAsync(HttpClient client, LoginResponse session)
+{
+    Console.WriteLine();
+    Console.WriteLine("Password change is required before continuing.");
+    Console.Write("New password: ");
+    var newPassword = Console.ReadLine() ?? string.Empty;
+    Console.Write("Confirm password: ");
+    var confirmPassword = Console.ReadLine() ?? string.Empty;
+
+    var response = await client.PostAsJsonAsync(
+        "/api/auth/change-password",
+        new ChangePasswordRequest(session.UserId, newPassword, confirmPassword));
+
+    if (!await ApiHelper.EnsureSuccessAsync(response))
     {
-        Console.WriteLine(content);
+        return false;
     }
+
+    Console.WriteLine("Password changed successfully.");
+    return true;
 }
