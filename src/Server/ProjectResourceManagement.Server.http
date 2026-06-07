@@ -1,6 +1,29 @@
 @ProjectResourceManagement.Server_HostAddress = http://localhost:5071
 
-GET {{ProjectResourceManagement.Server_HostAddress}}/weatherforecast/
+GET {{ProjectResourceManagement.Server_HostAddress}}/health
+Accept: application/json
+
+###
+
+GET {{ProjectResourceManagement.Server_HostAddress}}/api/skills
+X-User-Role: Admin
+Accept: application/json
+
+###
+
+POST {{ProjectResourceManagement.Server_HostAddress}}/api/skills
+X-User-Role: Admin
+Content-Type: application/json
+
+{
+  "name": "C#",
+  "category": "Backend"
+}
+
+###
+
+GET {{ProjectResourceManagement.Server_HostAddress}}/api/employees
+X-User-Role: Admin
 Accept: application/json
 
 ###
