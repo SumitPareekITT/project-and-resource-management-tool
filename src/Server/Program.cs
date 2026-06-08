@@ -5,6 +5,7 @@ using ProjectResourceManagement.Server.Data.Repositories;
 using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services;
 using ProjectResourceManagement.Server.Services.Admin;
+using ProjectResourceManagement.Server.Services.Manager;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +32,7 @@ builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddScoped<EmployeeAdminService>();
 builder.Services.AddScoped<SkillAdminService>();
 builder.Services.AddScoped<ProjectAdminService>();
+builder.Services.AddScoped<AllocationManagerService>();
 
 var app = builder.Build();
 

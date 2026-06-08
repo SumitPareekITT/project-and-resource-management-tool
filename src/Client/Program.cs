@@ -34,7 +34,9 @@ if (session.ForcePasswordChange)
 }
 
 httpClient.DefaultRequestHeaders.Remove("X-User-Role");
+httpClient.DefaultRequestHeaders.Remove("X-User-Id");
 httpClient.DefaultRequestHeaders.Add("X-User-Role", session.Role.ToString());
+httpClient.DefaultRequestHeaders.Add("X-User-Id", session.UserId.ToString());
 
 switch (session.Role)
 {
