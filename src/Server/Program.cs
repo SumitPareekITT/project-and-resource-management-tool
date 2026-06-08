@@ -6,6 +6,7 @@ using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
+using ProjectResourceManagement.Server.Services.Timesheets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +34,9 @@ builder.Services.AddScoped<EmployeeAdminService>();
 builder.Services.AddScoped<SkillAdminService>();
 builder.Services.AddScoped<ProjectAdminService>();
 builder.Services.AddScoped<AllocationManagerService>();
+builder.Services.AddScoped<ActivityTagRepository>();
+builder.Services.AddScoped<SystemConfigurationRepository>();
+builder.Services.AddScoped<TimesheetService>();
 
 var app = builder.Build();
 

@@ -5,12 +5,26 @@ namespace ProjectResourceManagement.Server.Data.Repositories;
 
 public sealed class TimesheetRepository(ApplicationDbContext dbContext)
 {
+    public Task<Timesheet?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Timesheets
+            .Include(timesheet => timesheet.Employee)
+            .Include(timesheet => timesheet.Entries)
+            .ThenInclude(entry => entry.Project)
+            .Include(timesheet => timesheet.Entries)
+            .ThenInclude(entry => entry.ActivityTags)
+            .FirstOrDefaultAsync(timesheet => timesheet.Id == id, cancellationToken);
+    }
+
     public Task<Timesheet?> GetByEmployeeWeekAsync(
         int employeeId,
         DateOnly weekStartDate,
         CancellationToken cancellationToken = default)
     {
         return dbContext.Timesheets
+            .Include(timesheet => timesheet.Employee)
+            .Include(timesheet => timesheet.Entries)
+            .ThenInclude(entry => entry.Project)
             .Include(timesheet => timesheet.Entries)
             .ThenInclude(entry => entry.ActivityTags)
             .FirstOrDefaultAsync(
@@ -21,6 +35,7 @@ public sealed class TimesheetRepository(ApplicationDbContext dbContext)
     public Task<List<Timesheet>> ListByEmployeeAsync(int employeeId, CancellationToken cancellationToken = default)
     {
         return dbContext.Timesheets
+            .Include(timesheet => timesheet.Employee)
             .Where(timesheet => timesheet.EmployeeId == employeeId)
             .OrderByDescending(timesheet => timesheet.WeekStartDate)
             .ToListAsync(cancellationToken);
@@ -34,6 +49,13 @@ public sealed class TimesheetRepository(ApplicationDbContext dbContext)
             .OrderByDescending(timesheet => timesheet.WeekStartDate)
             .ThenBy(timesheet => timesheet.Employee.FullName)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> ExistsForEmployeeWeekAsync(int employeeId, DateOnly weekStartDate, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Timesheets.AnyAsync(
+            timesheet => timesheet.EmployeeId == employeeId && timesheet.WeekStartDate == weekStartDate,
+            cancellationToken);
     }
 
     public async Task AddAsync(Timesheet timesheet, CancellationToken cancellationToken = default)

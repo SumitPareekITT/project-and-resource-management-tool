@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
+using ProjectResourceManagement.Server.Services.Timesheets;
 using ProjectResourceManagement.Shared.DTOs.Manager;
+using ProjectResourceManagement.Shared.DTOs.Timesheet;
 using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
@@ -10,7 +12,9 @@ namespace ProjectResourceManagement.Server.Controllers;
 [ApiController]
 [Route("api/manager")]
 [RequireRole(UserRole.Manager)]
-public sealed class ManagerController(AllocationManagerService allocationManagerService) : ControllerBase
+public sealed class ManagerController(
+    AllocationManagerService allocationManagerService,
+    TimesheetService timesheetService) : ControllerBase
 {
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboardAsync(CancellationToken cancellationToken)
@@ -60,6 +64,42 @@ public sealed class ManagerController(AllocationManagerService allocationManager
         return ToAllocationActionResult(result);
     }
 
+    [HttpGet("timesheets")]
+    public async Task<IActionResult> ListTeamTimesheetsAsync(CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await timesheetService.ListManagerTeamTimesheetsAsync(managerUserId, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpGet("timesheets/missing")]
+    public async Task<IActionResult> GetMissingTimesheetsAsync([FromQuery] DateOnly? weekStartDate, CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await timesheetService.GetMissingTimesheetRemindersAsync(managerUserId, weekStartDate, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpGet("timesheets/{timesheetId:int}")]
+    public async Task<IActionResult> GetTeamTimesheetAsync(int timesheetId, CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await timesheetService.GetManagerTeamTimesheetAsync(managerUserId, timesheetId, cancellationToken);
+        return ToDetailActionResult(result);
+    }
+
     private bool TryGetManagerUserId(out int managerUserId, out IActionResult? errorResult)
     {
         managerUserId = 0;
@@ -97,6 +137,11 @@ public sealed class ManagerController(AllocationManagerService allocationManager
             return Created(string.Empty, result.Value);
         }
 
+        return ToActionResult(result);
+    }
+
+    private IActionResult ToDetailActionResult(AdminResult<TimesheetDetailDto> result)
+    {
         return ToActionResult(result);
     }
 }
