@@ -6,7 +6,13 @@ using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
-using ProjectResourceManagement.Server.Services.Scheduling;
+using ProjectResourceManagement.Server.Services.Ai;
+using ProjectResourceManagement.Server.Services.Ai.Clients;
+using ProjectResourceManagement.Server.Services.Ai.Configuration;
+using ProjectResourceManagement.Server.Services.Ai.Facts;
+using ProjectResourceManagement.Server.Services.Ai.Filtering;
+using ProjectResourceManagement.Server.Services.Ai.Fallback;
+using ProjectResourceManagement.Server.Services.Ai.Prompts;
 using ProjectResourceManagement.Server.Services.Timesheets;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,9 +44,19 @@ builder.Services.AddScoped<AllocationManagerService>();
 builder.Services.AddScoped<ActivityTagRepository>();
 builder.Services.AddScoped<SystemConfigurationRepository>();
 builder.Services.AddScoped<TimesheetService>();
-builder.Services.AddScoped<UtilizationComputationService>();
-builder.Services.AddScoped<ProjectHealthService>();
-builder.Services.AddHostedService<PrmBackgroundScheduler>();
+builder.Services.AddHttpClient(nameof(GeminiLlmCompletionClient));
+builder.Services.AddHttpClient(nameof(GroqLlmCompletionClient));
+builder.Services.AddScoped<ILlmCompletionClient, GeminiLlmCompletionClient>();
+builder.Services.AddScoped<ILlmCompletionClient, GroqLlmCompletionClient>();
+builder.Services.AddScoped<LlmCompletionClientFactory>();
+builder.Services.AddScoped<LlmConfigurationReader>();
+builder.Services.AddScoped<SkillMatchCandidateFilter>();
+builder.Services.AddScoped<ProjectRiskFactAssembler>();
+builder.Services.AddScoped<SkillMatchPromptBuilder>();
+builder.Services.AddScoped<ProjectRiskPromptBuilder>();
+builder.Services.AddScoped<DeterministicSkillMatchSummarizer>();
+builder.Services.AddScoped<DeterministicProjectRiskSummarizer>();
+builder.Services.AddScoped<AiAssistantService>();
 
 var app = builder.Build();
 

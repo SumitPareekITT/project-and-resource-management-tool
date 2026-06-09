@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using ProjectResourceManagement.Shared.DTOs.Auth;
 using ProjectResourceManagement.Shared.DTOs.Manager;
+using ProjectResourceManagement.Shared.DTOs.Ai;
 using ProjectResourceManagement.Shared.DTOs.Timesheet;
 
 namespace ProjectResourceManagement.Client;
@@ -287,6 +288,101 @@ internal static class ManagerMenu
         {
             Console.WriteLine("No missing timesheets for the previous week.");
         }
+    }
+
+    private static async Task RunSkillMatcherAsync(HttpClient client)
+    {
+        Console.Write("Describe required skills (example: backend API and microservices): ");
+        var query = Console.ReadLine()?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            Console.WriteLine("Query is required.");
+            return;
+        }
+
+        Console.Write("Optional project ID (blank to skip): ");
+        int? projectId = null;
+        if (int.TryParse(Console.ReadLine(), out var parsedProjectId))
+        {
+            projectId = parsedProjectId;
+        }
+
+        var response = await client.PostAsJsonAsync(
+            "/api/manager/ai/skill-match",
+            new AiSkillMatchRequest(query, projectId));
+
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return;
+        }
+
+        var result = await ApiHelper.ReadAsync<AiSkillMatchResponse>(response);
+        if (result is null)
+        {
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Mode: {(result.UsedFallback ? "Fallback (no LLM)" : $"LLM ({result.ProviderUsed})")}");
+
+        ConsoleTable.Print(
+            ["Emp ID", "Name", "Status", "Util %", "Score", "Matched Skills"],
+            result.Candidates.Select(candidate => new[]
+            {
+                candidate.EmployeeId.ToString(),
+                candidate.FullName,
+                candidate.Status.ToString(),
+                candidate.CurrentUtilizationPercent.ToString("0.##"),
+                candidate.MatchScore.ToString(),
+                candidate.MatchedSkills.Count == 0 ? "-" : string.Join(", ", candidate.MatchedSkills)
+            }));
+
+        foreach (var candidate in result.Candidates)
+        {
+            Console.WriteLine($" - {candidate.Explanation}");
+        }
+    }
+
+    private static async Task RunProjectRiskSummaryAsync(HttpClient client)
+    {
+        await ListProjectsAsync(client);
+
+        Console.Write("Project ID: ");
+        if (!int.TryParse(Console.ReadLine(), out var projectId))
+        {
+            Console.WriteLine("Invalid project ID.");
+            return;
+        }
+
+        var response = await client.PostAsJsonAsync(
+            "/api/manager/ai/project-risk-summary",
+            new AiProjectRiskSummaryRequest(projectId));
+
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return;
+        }
+
+        var result = await ApiHelper.ReadAsync<AiProjectRiskSummaryResponse>(response);
+        if (result is null)
+        {
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"{result.ProjectName} | Health: {result.HealthStatus}");
+        Console.WriteLine($"Mode: {(result.UsedFallback ? "Fallback (no LLM)" : $"LLM ({result.ProviderUsed})")}");
+        Console.WriteLine();
+        Console.WriteLine("Facts used:");
+        foreach (var fact in result.FactLines)
+        {
+            Console.WriteLine($" - {fact}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Summary:");
+        Console.WriteLine(result.Summary);
     }
 
     private static async Task ChangePasswordAsync(HttpClient client, LoginResponse session)
