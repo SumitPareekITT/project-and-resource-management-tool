@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using ProjectResourceManagement.Shared.DTOs.Auth;
 using ProjectResourceManagement.Shared.DTOs.Manager;
+using ProjectResourceManagement.Shared.DTOs.Timesheet;
 
 namespace ProjectResourceManagement.Client;
 
@@ -17,8 +18,9 @@ internal static class ManagerMenu
             Console.WriteLine(" 2. Allocate team member to project");
             Console.WriteLine(" 3. End allocation");
             Console.WriteLine(" 4. My projects");
-            Console.WriteLine(" 5. Team timesheets          [Day 7]");
-            Console.WriteLine(" 6. Change password");
+            Console.WriteLine(" 5. Team timesheets");
+            Console.WriteLine(" 6. Missing timesheet reminders");
+            Console.WriteLine(" 7. Change password");
             Console.WriteLine(" 0. Logout");
             Console.Write("Choose option: ");
 
@@ -28,8 +30,9 @@ internal static class ManagerMenu
                 case "2": await AllocateTeamMemberAsync(client); break;
                 case "3": await EndAllocationAsync(client); break;
                 case "4": await ListProjectsAsync(client); break;
-                case "5": Console.WriteLine("Team timesheets will be available in Day 7."); break;
-                case "6": await ChangePasswordAsync(client, session); break;
+                case "5": await ListTeamTimesheetsAsync(client); break;
+                case "6": await ShowMissingTimesheetsAsync(client); break;
+                case "7": await ChangePasswordAsync(client, session); break;
                 case "0": return;
                 default: Console.WriteLine("Invalid option."); break;
             }
@@ -154,6 +157,88 @@ internal static class ManagerMenu
         if (await ApiHelper.EnsureSuccessAsync(response))
         {
             Console.WriteLine("Allocation ended successfully.");
+        }
+    }
+
+    private static async Task ListTeamTimesheetsAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/manager/timesheets");
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return;
+        }
+
+        var timesheets = await ApiHelper.ReadAsync<List<TimesheetSummaryDto>>(response) ?? [];
+        ConsoleTable.Print(
+            ["Timesheet ID", "Employee", "Week Start", "Total Hours", "Status", "Submitted At"],
+            timesheets.Select(item => new[]
+            {
+                item.TimesheetId.ToString(),
+                item.EmployeeName,
+                item.WeekStartDate.ToString("yyyy-MM-dd"),
+                item.TotalHours.ToString("0.##"),
+                item.Status.ToString(),
+                item.SubmittedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "-"
+            }));
+
+        if (timesheets.Count == 0)
+        {
+            return;
+        }
+
+        Console.Write("Enter Timesheet ID for detail (blank to skip): ");
+        if (!int.TryParse(Console.ReadLine(), out var timesheetId))
+        {
+            return;
+        }
+
+        var detailResponse = await client.GetAsync($"/api/manager/timesheets/{timesheetId}");
+        if (!await ApiHelper.EnsureSuccessAsync(detailResponse))
+        {
+            return;
+        }
+
+        var detail = await ApiHelper.ReadAsync<TimesheetDetailDto>(detailResponse);
+        if (detail is null)
+        {
+            return;
+        }
+
+        Console.WriteLine($"Detail for {detail.EmployeeName} | Week {detail.WeekStartDate:yyyy-MM-dd}");
+        ConsoleTable.Print(
+            ["Entry ID", "Project", "Hours", "Notes", "Activity Tags"],
+            detail.Entries.Select(entry => new[]
+            {
+                entry.EntryId.ToString(),
+                entry.ProjectName,
+                entry.HoursWorked.ToString("0.##"),
+                string.IsNullOrWhiteSpace(entry.Notes) ? "-" : entry.Notes,
+                entry.ActivityTags.Count == 0 ? "-" : string.Join(", ", entry.ActivityTags)
+            }));
+    }
+
+    private static async Task ShowMissingTimesheetsAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/manager/timesheets/missing");
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return;
+        }
+
+        var reminders = await ApiHelper.ReadAsync<List<MissingTimesheetReminderDto>>(response) ?? [];
+        ConsoleTable.Print(
+            ["Employee ID", "Employee", "Email", "Missing Week"],
+            reminders.Select(item => new[]
+            {
+                item.EmployeeId.ToString(),
+                item.EmployeeName,
+                item.Email,
+                item.WeekStartDate.ToString("yyyy-MM-dd")
+            }));
+
+        if (reminders.Count == 0)
+        {
+            Console.WriteLine("No missing timesheets for the previous week.");
         }
     }
 
