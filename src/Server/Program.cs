@@ -6,6 +6,7 @@ using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
+using ProjectResourceManagement.Server.Services.Scheduling;
 using ProjectResourceManagement.Server.Services.Timesheets;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +38,9 @@ builder.Services.AddScoped<AllocationManagerService>();
 builder.Services.AddScoped<ActivityTagRepository>();
 builder.Services.AddScoped<SystemConfigurationRepository>();
 builder.Services.AddScoped<TimesheetService>();
+builder.Services.AddScoped<UtilizationComputationService>();
+builder.Services.AddScoped<ProjectHealthService>();
+builder.Services.AddHostedService<PrmBackgroundScheduler>();
 
 var app = builder.Build();
 

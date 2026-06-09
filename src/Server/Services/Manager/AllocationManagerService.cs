@@ -1,6 +1,7 @@
 using ProjectResourceManagement.Server.Data.Repositories;
 using ProjectResourceManagement.Server.Models;
 using ProjectResourceManagement.Server.Services.Admin;
+using ProjectResourceManagement.Server.Services.Scheduling;
 using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Shared.DTOs.Manager;
 using ProjectResourceManagement.Shared.Enums;
@@ -10,7 +11,8 @@ namespace ProjectResourceManagement.Server.Services.Manager;
 public sealed class AllocationManagerService(
     EmployeeRepository employeeRepository,
     ProjectRepository projectRepository,
-    AllocationRepository allocationRepository)
+    AllocationRepository allocationRepository,
+    UtilizationComputationService utilizationComputationService)
 {
     public async Task<AdminResult<IReadOnlyList<ResourceDashboardRowDto>>> GetDashboardAsync(
         int managerUserId,
@@ -58,6 +60,8 @@ public sealed class AllocationManagerService(
                 project.Name,
                 project.ClientName,
                 project.Status,
+                project.HealthStatus,
+                ProjectHealthService.FormatStoryPointProgress(project),
                 project.StartDate,
                 project.EndDate))
             .ToList();
@@ -131,7 +135,7 @@ public sealed class AllocationManagerService(
 
         await allocationRepository.AddAsync(allocation, cancellationToken);
         await allocationRepository.SaveChangesAsync(cancellationToken);
-        await SyncEmployeeUtilizationAsync(employee, cancellationToken);
+        await utilizationComputationService.SyncEmployeeAsync(employee, cancellationToken);
         await employeeRepository.SaveChangesAsync(cancellationToken);
 
         var created = await allocationRepository.GetByIdAsync(allocation.Id, cancellationToken);
@@ -168,28 +172,10 @@ public sealed class AllocationManagerService(
             allocation.ToDate = today;
         }
 
-        await SyncEmployeeUtilizationAsync(allocation.Employee, cancellationToken);
+        await utilizationComputationService.SyncEmployeeAsync(allocation.Employee, cancellationToken);
         await allocationRepository.SaveChangesAsync(cancellationToken);
 
         return AdminResult<AllocationDetailDto>.Success(MapAllocation(allocation), "Allocation ended successfully.");
-    }
-
-    private async Task SyncEmployeeUtilizationAsync(Employee employee, CancellationToken cancellationToken)
-    {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var activeAllocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
-        var currentUtilization = activeAllocations
-            .Where(allocation => IsActiveOnDate(allocation, today))
-            .Sum(allocation => allocation.UtilizationPercentage);
-
-        employee.CurrentUtilizationPercent = currentUtilization;
-        employee.Status = currentUtilization switch
-        {
-            0 => EmployeeStatus.Bench,
-            BusinessRules.FullAllocationPercent => EmployeeStatus.Allocated,
-            > BusinessRules.FullAllocationPercent => EmployeeStatus.Allocated,
-            _ => EmployeeStatus.PartiallyAllocated
-        };
     }
 
     private static bool IsActiveOnDate(Allocation allocation, DateOnly date)

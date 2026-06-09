@@ -7,5 +7,7 @@ public sealed record ManagerProjectOptionDto(
     string Name,
     string ClientName,
     ProjectStatus Status,
+    ProjectHealthStatus HealthStatus,
+    string StoryPointProgress,
     DateOnly StartDate,
     DateOnly EndDate);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectResourceManagement.Server.Models;
+using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Data.Repositories;
 
@@ -26,6 +27,15 @@ public sealed class ProjectRepository(ApplicationDbContext dbContext)
     {
         return dbContext.Projects
             .Where(project => project.ManagerId == managerId)
+            .OrderBy(project => project.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<Project>> ListForHealthEvaluationAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Projects
+            .Include(project => project.Milestones)
+            .Where(project => project.Status == ProjectStatus.Active || project.Status == ProjectStatus.Planned)
             .OrderBy(project => project.Name)
             .ToListAsync(cancellationToken);
     }

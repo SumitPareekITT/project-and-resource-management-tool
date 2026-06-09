@@ -18,9 +18,10 @@ internal static class ManagerMenu
             Console.WriteLine(" 2. Allocate team member to project");
             Console.WriteLine(" 3. End allocation");
             Console.WriteLine(" 4. My projects");
-            Console.WriteLine(" 5. Team timesheets");
-            Console.WriteLine(" 6. Missing timesheet reminders");
-            Console.WriteLine(" 7. Change password");
+            Console.WriteLine(" 5. Project health dashboard");
+            Console.WriteLine(" 6. Team timesheets");
+            Console.WriteLine(" 7. Missing timesheet reminders");
+            Console.WriteLine(" 8. Change password");
             Console.WriteLine(" 0. Logout");
             Console.Write("Choose option: ");
 
@@ -30,9 +31,10 @@ internal static class ManagerMenu
                 case "2": await AllocateTeamMemberAsync(client); break;
                 case "3": await EndAllocationAsync(client); break;
                 case "4": await ListProjectsAsync(client); break;
-                case "5": await ListTeamTimesheetsAsync(client); break;
-                case "6": await ShowMissingTimesheetsAsync(client); break;
-                case "7": await ChangePasswordAsync(client, session); break;
+                case "5": await ShowProjectHealthAsync(client); break;
+                case "6": await ListTeamTimesheetsAsync(client); break;
+                case "7": await ShowMissingTimesheetsAsync(client); break;
+                case "8": await ChangePasswordAsync(client, session); break;
                 case "0": return;
                 default: Console.WriteLine("Invalid option."); break;
             }
@@ -78,16 +80,61 @@ internal static class ManagerMenu
 
         var projects = await ApiHelper.ReadAsync<List<ManagerProjectOptionDto>>(response) ?? [];
         ConsoleTable.Print(
-            ["Project ID", "Name", "Client", "Status", "Start", "End"],
+            ["Project ID", "Name", "Client", "Status", "Health", "SP Done/Total", "Start", "End"],
             projects.Select(project => new[]
             {
                 project.ProjectId.ToString(),
                 project.Name,
                 project.ClientName,
                 project.Status.ToString(),
+                project.HealthStatus.ToString(),
+                project.StoryPointProgress,
                 project.StartDate.ToString("yyyy-MM-dd"),
                 project.EndDate.ToString("yyyy-MM-dd")
             }));
+    }
+
+    private static async Task ShowProjectHealthAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/manager/projects/health");
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return;
+        }
+
+        var projects = await ApiHelper.ReadAsync<List<ManagerProjectHealthDto>>(response) ?? [];
+        ConsoleTable.Print(
+            ["Project ID", "Name", "Health", "SP Done/Total", "Allocations", "Prev Week Hrs", "Expected Hrs"],
+            projects.Select(project => new[]
+            {
+                project.ProjectId.ToString(),
+                project.Name,
+                project.HealthStatus.ToString(),
+                project.StoryPointProgress,
+                project.ActiveAllocationCount.ToString(),
+                project.PreviousWeekLoggedHours.ToString("0.##"),
+                project.PreviousWeekExpectedHours.ToString("0.##")
+            }));
+
+        foreach (var project in projects)
+        {
+            if (project.HealthSignals.Count == 0)
+            {
+                continue;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"{project.Name} signals:");
+            foreach (var signal in project.HealthSignals)
+            {
+                Console.WriteLine($" - {signal}");
+            }
+        }
+
+        if (projects.Count == 0)
+        {
+            Console.WriteLine("No active/planned projects found for your account.");
+        }
     }
 
     private static async Task AllocateTeamMemberAsync(HttpClient client)
