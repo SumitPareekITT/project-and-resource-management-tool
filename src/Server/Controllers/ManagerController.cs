@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
+using ProjectResourceManagement.Server.Services.Scheduling;
 using ProjectResourceManagement.Server.Services.Timesheets;
 using ProjectResourceManagement.Shared.DTOs.Manager;
 using ProjectResourceManagement.Shared.DTOs.Timesheet;
@@ -14,6 +15,7 @@ namespace ProjectResourceManagement.Server.Controllers;
 [RequireRole(UserRole.Manager)]
 public sealed class ManagerController(
     AllocationManagerService allocationManagerService,
+    ProjectHealthService projectHealthService,
     TimesheetService timesheetService) : ControllerBase
 {
     [HttpGet("dashboard")]
@@ -37,6 +39,18 @@ public sealed class ManagerController(
         }
 
         var result = await allocationManagerService.ListOwnedProjectsAsync(managerUserId, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpGet("projects/health")]
+    public async Task<IActionResult> ListProjectHealthAsync(CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await projectHealthService.ListManagerProjectHealthAsync(managerUserId, cancellationToken);
         return ToActionResult(result);
     }
 

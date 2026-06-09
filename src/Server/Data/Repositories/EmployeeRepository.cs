@@ -46,6 +46,14 @@ public sealed class EmployeeRepository(ApplicationDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<Employee>> ListActiveAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.Employees
+            .Where(employee => employee.IsActive)
+            .OrderBy(employee => employee.FullName)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<List<Employee>> ListByManagerIdAsync(int managerId, CancellationToken cancellationToken = default)
     {
         return dbContext.Employees

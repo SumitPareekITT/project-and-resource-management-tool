@@ -51,6 +51,30 @@ public sealed class TimesheetRepository(ApplicationDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public Task<decimal> SumProjectHoursForWeekAsync(
+        int projectId,
+        DateOnly weekStartDate,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.TimesheetEntries
+            .Where(entry => entry.ProjectId == projectId && entry.Timesheet.WeekStartDate == weekStartDate)
+            .SumAsync(entry => entry.HoursWorked, cancellationToken);
+    }
+
+    public async Task<HashSet<int>> ListSubmittedEmployeeIdsForProjectWeekAsync(
+        int projectId,
+        DateOnly weekStartDate,
+        CancellationToken cancellationToken = default)
+    {
+        var employeeIds = await dbContext.TimesheetEntries
+            .Where(entry => entry.ProjectId == projectId && entry.Timesheet.WeekStartDate == weekStartDate)
+            .Select(entry => entry.Timesheet.EmployeeId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return employeeIds.ToHashSet();
+    }
+
     public Task<bool> ExistsForEmployeeWeekAsync(int employeeId, DateOnly weekStartDate, CancellationToken cancellationToken = default)
     {
         return dbContext.Timesheets.AnyAsync(

@@ -4,6 +4,7 @@ using ProjectResourceManagement.Server.Data.Repositories;
 using ProjectResourceManagement.Server.Models;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
+using ProjectResourceManagement.Server.Services.Scheduling;
 using ProjectResourceManagement.Shared.DTOs.Manager;
 using ProjectResourceManagement.Shared.Enums;
 
@@ -109,7 +110,10 @@ public sealed class AllocationManagerServiceTests
         return new AllocationManagerService(
             new EmployeeRepository(dbContext),
             new ProjectRepository(dbContext),
-            new AllocationRepository(dbContext));
+            new AllocationRepository(dbContext),
+            new UtilizationComputationService(
+                new EmployeeRepository(dbContext),
+                new AllocationRepository(dbContext)));
     }
 
     private static ApplicationDbContext CreateDbContext()
