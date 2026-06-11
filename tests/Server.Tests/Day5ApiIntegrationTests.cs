@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ProjectResourceManagement.Server.Data;
-using ProjectResourceManagement.Server.Models;
 using ProjectResourceManagement.Shared.DTOs.Admin;
 using ProjectResourceManagement.Shared.DTOs.Auth;
 using ProjectResourceManagement.Shared.Enums;
@@ -22,16 +21,7 @@ public sealed class Day5ApiIntegrationTests : IClassFixture<Day5ApiFactory>
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         if (!dbContext.Users.Any(user => user.Id == 2))
         {
-            dbContext.Users.Add(new User
-            {
-                Id = 2,
-                FullName = "Manager Demo",
-                Email = "manager.demo@test.local",
-                Username = "manager.demo",
-                PasswordHash = "hash",
-                Role = UserRole.Manager,
-                IsActive = true
-            });
+            SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager.demo", "Manager Demo", "manager.demo@test.local", UserRole.Manager);
             dbContext.SaveChanges();
         }
 
@@ -41,13 +31,15 @@ public sealed class Day5ApiIntegrationTests : IClassFixture<Day5ApiFactory>
     [Fact]
     public async Task Login_ReturnsSuccess_ForSeededAdminAfterHashBootstrap()
     {
-        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest("admin", "Admin@1234"));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var login = await AuthTestHelper.LoginAsync(_client, "admin", "Admin@1234");
+        Assert.Contains("Admin", login.Roles);
     }
 
     [Fact]
     public async Task CreateProject_WorksForAdminRole()
     {
+        var token = await AuthTestHelper.LoginAndGetTokenAsync(_client, "admin", "Admin@1234");
+
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/projects")
         {
             Content = JsonContent.Create(new CreateProjectRequest(
@@ -59,7 +51,7 @@ public sealed class Day5ApiIntegrationTests : IClassFixture<Day5ApiFactory>
                 2,
                 80))
         };
-        request.Headers.Add("X-User-Role", "Admin");
+        AuthTestHelper.SetBearerToken(request, token);
 
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

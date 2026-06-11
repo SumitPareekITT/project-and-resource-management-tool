@@ -9,6 +9,7 @@ public sealed class ProjectAdminService(
     ProjectRepository projectRepository,
     MilestoneRepository milestoneRepository,
     UserRepository userRepository,
+    RbacRepository rbacRepository,
     AllocationRepository allocationRepository)
 {
     public async Task<AdminResult<IReadOnlyList<ProjectSummaryDto>>> ListProjectsAsync(CancellationToken cancellationToken = default)
@@ -37,7 +38,7 @@ public sealed class ProjectAdminService(
             request.Name,
             request.StartDate,
             request.EndDate,
-            request.ManagerId,
+            request.ManagerUserId,
             request.TotalStoryPoints,
             0,
             cancellationToken);
@@ -53,7 +54,7 @@ public sealed class ProjectAdminService(
             Description = request.Description.Trim(),
             StartDate = request.StartDate,
             EndDate = request.EndDate,
-            ManagerId = request.ManagerId,
+            ManagerUserId = request.ManagerUserId,
             TotalStoryPoints = request.TotalStoryPoints,
             CompletedStoryPoints = 0,
             Status = ProjectStatus.Planned,
@@ -82,7 +83,7 @@ public sealed class ProjectAdminService(
             request.Name,
             request.StartDate,
             request.EndDate,
-            request.ManagerId,
+            request.ManagerUserId,
             request.TotalStoryPoints,
             request.CompletedStoryPoints,
             cancellationToken);
@@ -97,7 +98,7 @@ public sealed class ProjectAdminService(
         project.StartDate = request.StartDate;
         project.EndDate = request.EndDate;
         project.Status = request.Status;
-        project.ManagerId = request.ManagerId;
+        project.ManagerUserId = request.ManagerUserId;
         project.TotalStoryPoints = request.TotalStoryPoints;
         project.CompletedStoryPoints = request.CompletedStoryPoints;
 
@@ -217,11 +218,11 @@ public sealed class ProjectAdminService(
         var allocations = await allocationRepository.ListAllActiveAsync(cancellationToken);
         var rows = allocations.Select(allocation => new AllocationMatrixRowDto(
             allocation.Id,
-            allocation.EmployeeId,
-            allocation.Employee.FullName,
+            allocation.UserId,
+            allocation.User.Profile!.FullName,
             allocation.ProjectId,
             allocation.Project.Name,
-            allocation.Project.Manager.FullName,
+            allocation.Project.ManagerUser.Profile!.FullName,
             allocation.UtilizationPercentage,
             allocation.FromDate,
             allocation.ToDate,
@@ -234,7 +235,7 @@ public sealed class ProjectAdminService(
         string name,
         DateOnly startDate,
         DateOnly endDate,
-        int managerId,
+        int managerUserId,
         int totalStoryPoints,
         int completedStoryPoints,
         CancellationToken cancellationToken)
@@ -264,10 +265,16 @@ public sealed class ProjectAdminService(
             return AdminResult<ProjectSummaryDto>.Fail(AdminResultCode.ValidationError, "Completed story points cannot exceed total story points.");
         }
 
-        var manager = await userRepository.GetByIdAsync(managerId, cancellationToken);
-        if (manager is null || manager.Role != UserRole.Manager || !manager.IsActive)
+        var manager = await userRepository.GetByIdAsync(managerUserId, cancellationToken);
+        if (manager is null || !manager.IsActive)
         {
-            return AdminResult<ProjectSummaryDto>.Fail(AdminResultCode.ValidationError, "Manager must be an active user with Manager role.");
+            return AdminResult<ProjectSummaryDto>.Fail(AdminResultCode.ValidationError, "Manager must be an active user.");
+        }
+
+        var managerRoles = await rbacRepository.GetRoleNamesForUserAsync(managerUserId, cancellationToken);
+        if (!managerRoles.Contains(nameof(UserRole.Manager), StringComparer.OrdinalIgnoreCase))
+        {
+            return AdminResult<ProjectSummaryDto>.Fail(AdminResultCode.ValidationError, "Manager must have Manager role.");
         }
 
         return null;
@@ -317,8 +324,8 @@ public sealed class ProjectAdminService(
             project.ClientName,
             project.Status,
             project.HealthStatus,
-            project.ManagerId,
-            project.Manager.FullName,
+            project.ManagerUserId,
+            project.ManagerUser.Profile!.FullName,
             project.StartDate,
             project.EndDate,
             project.TotalStoryPoints,

@@ -12,7 +12,7 @@ using ProjectResourceManagement.Shared.Enums;
 namespace ProjectResourceManagement.Server.Services.Ai;
 
 public sealed class AiAssistantService(
-    EmployeeRepository employeeRepository,
+    UserProfileRepository userProfileRepository,
     ProjectRepository projectRepository,
     SkillMatchCandidateFilter skillMatchCandidateFilter,
     ProjectRiskFactAssembler projectRiskFactAssembler,
@@ -43,7 +43,7 @@ public sealed class AiAssistantService(
                 return AdminResult<AiSkillMatchResponse>.Fail(AdminResultCode.NotFound, "Project was not found.");
             }
 
-            if (ownedProject.ManagerId != managerUserId)
+            if (ownedProject.ManagerUserId != managerUserId)
             {
                 return AdminResult<AiSkillMatchResponse>.Fail(
                     AdminResultCode.ValidationError,
@@ -51,7 +51,7 @@ public sealed class AiAssistantService(
             }
         }
 
-        var directTeam = await employeeRepository.ListByManagerIdAsync(managerUserId, cancellationToken);
+        var directTeam = await userProfileRepository.ListByManagerUserIdAsync(managerUserId, cancellationToken);
         var filteredCandidates = skillMatchCandidateFilter.FilterDirectTeam(directTeam, request.Query.Trim());
         var llmSettings = await llmConfigurationReader.ReadAsync(cancellationToken);
         var summary = await BuildSkillMatchSummaryAsync(request.Query.Trim(), filteredCandidates, llmSettings, cancellationToken);
@@ -165,10 +165,10 @@ public sealed class AiAssistantService(
     private static SkillMatchCandidateDto MapSkillMatchCandidate(SkillMatchCandidate candidate)
     {
         return new SkillMatchCandidateDto(
-            candidate.Employee.Id,
-            candidate.Employee.FullName,
-            candidate.Employee.Department,
-            candidate.Employee.Designation,
+            candidate.Profile.UserId,
+            candidate.Profile.FullName,
+            candidate.Profile.Department,
+            candidate.Profile.Designation,
             candidate.Status,
             candidate.CurrentUtilizationPercent,
             candidate.MatchScore,

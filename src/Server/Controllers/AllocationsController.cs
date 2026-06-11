@@ -1,13 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Server.Services.Admin;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/allocations")]
-[RequireRole(UserRole.Admin)]
+[RequirePermission(PermissionCodes.AllocationsMatrix)]
 public sealed class AllocationsController(ProjectAdminService projectAdminService) : ControllerBase
 {
     [HttpGet("matrix")]

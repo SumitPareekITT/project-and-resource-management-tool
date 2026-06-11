@@ -8,26 +8,26 @@ using ProjectResourceManagement.Shared.Enums;
 namespace ProjectResourceManagement.Server.Services.Timesheets;
 
 public sealed class TimesheetService(
-    EmployeeRepository employeeRepository,
+    UserProfileRepository userProfileRepository,
     AllocationRepository allocationRepository,
     TimesheetRepository timesheetRepository,
     ActivityTagRepository activityTagRepository,
     SystemConfigurationRepository systemConfigurationRepository)
 {
     public async Task<AdminResult<IReadOnlyList<ActiveProjectForTimesheetDto>>> GetActiveProjectsForWeekAsync(
-        int employeeUserId,
+        int userId,
         DateOnly weekStartDate,
         CancellationToken cancellationToken = default)
     {
-        var employee = await GetEmployeeByUserIdAsync(employeeUserId, cancellationToken);
-        if (employee is null)
+        var profile = await GetProfileByUserIdAsync(userId, cancellationToken);
+        if (profile is null)
         {
-            return AdminResult<IReadOnlyList<ActiveProjectForTimesheetDto>>.Fail(AdminResultCode.NotFound, "Employee profile was not found.");
+            return AdminResult<IReadOnlyList<ActiveProjectForTimesheetDto>>.Fail(AdminResultCode.NotFound, "User profile was not found.");
         }
 
         var normalizedWeek = NormalizeWeekStart(weekStartDate);
         var maxWeeklyHours = await GetMaxWeeklyHoursAsync(cancellationToken);
-        var allocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
+        var allocations = await allocationRepository.ListActiveByUserIdAsync(userId, cancellationToken);
         var activeForWeek = allocations
             .Where(allocation => AllocationCoversWeek(allocation, normalizedWeek))
             .Select(allocation => new ActiveProjectForTimesheetDto(
@@ -41,7 +41,7 @@ public sealed class TimesheetService(
     }
 
     public async Task<AdminResult<TimesheetDetailDto>> SubmitAsync(
-        int employeeUserId,
+        int userId,
         SubmitTimesheetRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -50,10 +50,10 @@ public sealed class TimesheetService(
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.ValidationError, "At least one timesheet entry is required.");
         }
 
-        var employee = await GetEmployeeByUserIdAsync(employeeUserId, cancellationToken);
-        if (employee is null || !employee.IsActive)
+        var profile = await GetProfileByUserIdAsync(userId, cancellationToken);
+        if (profile is null || !profile.IsActive)
         {
-            return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "Employee profile was not found or is inactive.");
+            return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "User profile was not found or is inactive.");
         }
 
         var weekStart = NormalizeWeekStart(request.WeekStartDate);
@@ -68,7 +68,7 @@ public sealed class TimesheetService(
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.ValidationError, "Future-week timesheet submission is not allowed.");
         }
 
-        if (await timesheetRepository.ExistsForEmployeeWeekAsync(employee.Id, weekStart, cancellationToken))
+        if (await timesheetRepository.ExistsForUserWeekAsync(userId, weekStart, cancellationToken))
         {
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.Conflict, "Timesheet for this week already exists.");
         }
@@ -82,12 +82,12 @@ public sealed class TimesheetService(
                 $"Total weekly hours cannot exceed {maxWeeklyHours}.");
         }
 
-        var allocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
+        var allocations = await allocationRepository.ListActiveByUserIdAsync(userId, cancellationToken);
         var weekAllocations = allocations.Where(allocation => AllocationCoversWeek(allocation, weekStart)).ToList();
 
         var timesheet = new Timesheet
         {
-            EmployeeId = employee.Id,
+            UserId = userId,
             WeekStartDate = weekStart,
             TotalHours = totalHours,
             Status = TimesheetStatus.Submitted,
@@ -149,31 +149,29 @@ public sealed class TimesheetService(
     }
 
     public async Task<AdminResult<IReadOnlyList<TimesheetSummaryDto>>> ListEmployeeHistoryAsync(
-        int employeeUserId,
+        int userId,
         CancellationToken cancellationToken = default)
     {
-        var employee = await GetEmployeeByUserIdAsync(employeeUserId, cancellationToken);
-        if (employee is null)
+        if (await GetProfileByUserIdAsync(userId, cancellationToken) is null)
         {
-            return AdminResult<IReadOnlyList<TimesheetSummaryDto>>.Fail(AdminResultCode.NotFound, "Employee profile was not found.");
+            return AdminResult<IReadOnlyList<TimesheetSummaryDto>>.Fail(AdminResultCode.NotFound, "User profile was not found.");
         }
 
-        var timesheets = await timesheetRepository.ListByEmployeeAsync(employee.Id, cancellationToken);
+        var timesheets = await timesheetRepository.ListByUserIdAsync(userId, cancellationToken);
         return AdminResult<IReadOnlyList<TimesheetSummaryDto>>.Success(timesheets.Select(MapSummary).ToList());
     }
 
     public async Task<AdminResult<TimesheetDetailDto>> GetEmployeeTimesheetAsync(
-        int employeeUserId,
+        int userId,
         DateOnly weekStartDate,
         CancellationToken cancellationToken = default)
     {
-        var employee = await GetEmployeeByUserIdAsync(employeeUserId, cancellationToken);
-        if (employee is null)
+        if (await GetProfileByUserIdAsync(userId, cancellationToken) is null)
         {
-            return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "Employee profile was not found.");
+            return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "User profile was not found.");
         }
 
-        var timesheet = await timesheetRepository.GetByEmployeeWeekAsync(employee.Id, NormalizeWeekStart(weekStartDate), cancellationToken);
+        var timesheet = await timesheetRepository.GetByUserWeekAsync(userId, NormalizeWeekStart(weekStartDate), cancellationToken);
         if (timesheet is null)
         {
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "Timesheet was not found.");
@@ -183,16 +181,15 @@ public sealed class TimesheetService(
     }
 
     public async Task<AdminResult<IReadOnlyList<EmployeeAllocationDto>>> ListEmployeeAllocationsAsync(
-        int employeeUserId,
+        int userId,
         CancellationToken cancellationToken = default)
     {
-        var employee = await GetEmployeeByUserIdAsync(employeeUserId, cancellationToken);
-        if (employee is null)
+        if (await GetProfileByUserIdAsync(userId, cancellationToken) is null)
         {
-            return AdminResult<IReadOnlyList<EmployeeAllocationDto>>.Fail(AdminResultCode.NotFound, "Employee profile was not found.");
+            return AdminResult<IReadOnlyList<EmployeeAllocationDto>>.Fail(AdminResultCode.NotFound, "User profile was not found.");
         }
 
-        var allocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
+        var allocations = await allocationRepository.ListActiveByUserIdAsync(userId, cancellationToken);
         var mapped = allocations.Select(allocation => new EmployeeAllocationDto(
             allocation.Id,
             allocation.ProjectId,
@@ -224,7 +221,7 @@ public sealed class TimesheetService(
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "Timesheet was not found.");
         }
 
-        if (timesheet.Employee.ManagerId != managerUserId)
+        if (timesheet.User.Profile?.ManagerUserId != managerUserId)
         {
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.ValidationError, "Timesheet is outside your direct team.");
         }
@@ -241,24 +238,51 @@ public sealed class TimesheetService(
             ? NormalizeWeekStart(DateOnly.FromDateTime(DateTime.UtcNow)).AddDays(-7)
             : NormalizeWeekStart(weekStartDate.Value);
 
-        var team = await employeeRepository.ListByManagerIdAsync(managerUserId, cancellationToken);
+        var team = await userProfileRepository.ListByManagerUserIdAsync(managerUserId, cancellationToken);
         var reminders = new List<MissingTimesheetReminderDto>();
 
-        foreach (var employee in team.Where(member => member.IsActive))
+        foreach (var profile in team.Where(member => member.IsActive))
         {
-            var exists = await timesheetRepository.ExistsForEmployeeWeekAsync(employee.Id, targetWeek, cancellationToken);
+            var exists = await timesheetRepository.ExistsForUserWeekAsync(profile.UserId, targetWeek, cancellationToken);
             if (!exists)
             {
-                reminders.Add(new MissingTimesheetReminderDto(employee.Id, employee.FullName, employee.Email, targetWeek));
+                reminders.Add(new MissingTimesheetReminderDto(profile.UserId, profile.FullName, profile.Email, targetWeek));
             }
         }
 
-        return AdminResult<IReadOnlyList<MissingTimesheetReminderDto>>.Success(reminders.OrderBy(item => item.EmployeeName).ToList());
+        return AdminResult<IReadOnlyList<MissingTimesheetReminderDto>>.Success(reminders.OrderBy(item => item.UserName).ToList());
     }
 
-    private async Task<Employee?> GetEmployeeByUserIdAsync(int employeeUserId, CancellationToken cancellationToken)
+    public async Task<AdminResult<IReadOnlyList<ActivityTagOptionDto>>> ListActivityTagsAsync(
+        CancellationToken cancellationToken = default)
     {
-        return await employeeRepository.GetByUserIdAsync(employeeUserId, cancellationToken);
+        var tags = await activityTagRepository.ListActiveAsync(cancellationToken);
+        var mapped = tags
+            .Select(tag => new ActivityTagOptionDto(tag.Id, tag.Name, tag.Category))
+            .ToList();
+
+        return AdminResult<IReadOnlyList<ActivityTagOptionDto>>.Success(mapped);
+    }
+
+    public async Task<AdminResult<EmployeeTimesheetReminderDto>> GetEmployeeMissingTimesheetReminderAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        if (await GetProfileByUserIdAsync(userId, cancellationToken) is null)
+        {
+            return AdminResult<EmployeeTimesheetReminderDto>.Fail(AdminResultCode.NotFound, "User profile was not found.");
+        }
+
+        var previousWeek = NormalizeWeekStart(DateOnly.FromDateTime(DateTime.UtcNow)).AddDays(-7);
+        var exists = await timesheetRepository.ExistsForUserWeekAsync(userId, previousWeek, cancellationToken);
+
+        return AdminResult<EmployeeTimesheetReminderDto>.Success(
+            new EmployeeTimesheetReminderDto(!exists, exists ? null : previousWeek));
+    }
+
+    private Task<UserProfile?> GetProfileByUserIdAsync(int userId, CancellationToken cancellationToken)
+    {
+        return userProfileRepository.GetByUserIdAsync(userId, cancellationToken);
     }
 
     private async Task<decimal> GetMaxWeeklyHoursAsync(CancellationToken cancellationToken)
@@ -293,10 +317,11 @@ public sealed class TimesheetService(
 
     private static TimesheetSummaryDto MapSummary(Timesheet timesheet)
     {
+        var userName = timesheet.User.Profile?.FullName ?? timesheet.User.Username;
         return new TimesheetSummaryDto(
             timesheet.Id,
-            timesheet.EmployeeId,
-            timesheet.Employee.FullName,
+            timesheet.UserId,
+            userName,
             timesheet.WeekStartDate,
             timesheet.TotalHours,
             timesheet.Status,
@@ -305,6 +330,7 @@ public sealed class TimesheetService(
 
     private static TimesheetDetailDto MapDetail(Timesheet timesheet)
     {
+        var userName = timesheet.User.Profile?.FullName ?? timesheet.User.Username;
         var entries = timesheet.Entries
             .Select(entry => new TimesheetEntryDto(
                 entry.Id,
@@ -317,8 +343,8 @@ public sealed class TimesheetService(
 
         return new TimesheetDetailDto(
             timesheet.Id,
-            timesheet.EmployeeId,
-            timesheet.Employee.FullName,
+            timesheet.UserId,
+            userName,
             timesheet.WeekStartDate,
             timesheet.TotalHours,
             timesheet.Status,

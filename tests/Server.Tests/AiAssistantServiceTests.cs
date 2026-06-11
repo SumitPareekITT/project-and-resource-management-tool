@@ -77,27 +77,10 @@ public sealed class AiAssistantServiceTests
 
     private static async Task SeedAiScenarioAsync(ApplicationDbContext dbContext)
     {
-        dbContext.Users.AddRange(
-            new User
-            {
-                Id = 2,
-                FullName = "Manager",
-                Email = "m@test",
-                Username = "manager",
-                PasswordHash = "h",
-                Role = UserRole.Manager,
-                IsActive = true
-            },
-            new User
-            {
-                Id = 20,
-                FullName = "Employee User",
-                Email = "e1@test",
-                Username = "emp1",
-                PasswordHash = "h",
-                Role = UserRole.Employee,
-                IsActive = true
-            });
+        SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "m@test", UserRole.Manager);
+        SchemaV3TestHelpers.SeedUser(dbContext, 20, "emp1", "Employee User", "e1@test", UserRole.Employee);
+        await dbContext.SaveChangesAsync();
+        dbContext.UserProfiles.Single(p => p.UserId == 20).ManagerUserId = 2;
 
         var backendSkill = new Skill
         {
@@ -111,7 +94,7 @@ public sealed class AiAssistantServiceTests
         {
             Id = 1,
             Name = "Apollo",
-            ManagerId = 2,
+            ManagerUserId = 2,
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-1)),
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
             Status = ProjectStatus.Active,
@@ -119,36 +102,24 @@ public sealed class AiAssistantServiceTests
             TotalStoryPoints = 100,
             CompletedStoryPoints = 30
         });
-
-        var employee = new Employee
+        var employee = dbContext.UserProfiles.Single(p => p.UserId == 20);
+        employee.ManagerUserId = 2;
+        employee.CurrentUtilizationPercent = 50;
+        employee.ResourceStatus = EmployeeStatus.PartiallyAllocated;
+dbContext.UserSkills.Add(new UserSkill
         {
-            Id = 10,
             UserId = 20,
-            ManagerId = 2,
-            FullName = "Employee One",
-            Email = "e1@test",
-            Department = "Engineering",
-            Designation = "Developer",
-            IsActive = true,
-            CurrentUtilizationPercent = 50,
-            Status = EmployeeStatus.PartiallyAllocated
-        };
-        dbContext.Employees.Add(employee);
-        dbContext.EmployeeSkills.Add(new EmployeeSkill
-        {
-            EmployeeId = 10,
             SkillId = 1,
             ProficiencyLevel = ProficiencyLevel.Advanced,
-            Employee = employee,
             Skill = backendSkill
         });
 
         dbContext.Allocations.Add(new Allocation
         {
             Id = 1,
-            EmployeeId = 10,
+            UserId = 20,
             ProjectId = 1,
-            CreatedByManagerId = 2,
+            CreatedByUserId = 2,
             UtilizationPercentage = 50,
             FromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)),
             Status = AllocationStatus.Active
@@ -160,7 +131,7 @@ public sealed class AiAssistantServiceTests
     private static AiAssistantService CreateService(ApplicationDbContext dbContext)
     {
         return new AiAssistantService(
-            new EmployeeRepository(dbContext),
+            new UserProfileRepository(dbContext),
             new ProjectRepository(dbContext),
             new SkillMatchCandidateFilter(),
             new ProjectRiskFactAssembler(

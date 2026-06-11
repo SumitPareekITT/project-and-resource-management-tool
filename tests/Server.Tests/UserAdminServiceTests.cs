@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ProjectResourceManagement.Server.Data;
 using ProjectResourceManagement.Server.Data.Repositories;
 using ProjectResourceManagement.Server.Services;
@@ -14,19 +14,24 @@ public sealed class UserAdminServiceTests
     public async Task CreateUserAsync_CreatesManagerWithForcePasswordChange()
     {
         await using var dbContext = CreateDbContext();
+        SchemaV3TestHelpers.SeedRoles(dbContext);
+        await dbContext.SaveChangesAsync();
         var hasher = new Pbkdf2PasswordHasher();
-        var service = new UserAdminService(new UserRepository(dbContext), hasher);
+        var service = CreateService(dbContext, hasher);
 
         var result = await service.CreateUserAsync(new CreateUserRequest(
             "Manager One",
             "manager.one@test.local",
             "manager.one",
             "Temp@1234",
-            UserRole.Manager));
+            UserRole.Manager,
+            "Delivery",
+            "Manager",
+            null));
 
         Assert.True(result.Succeeded);
         Assert.True(result.Value!.ForcePasswordChange);
-        Assert.Equal(UserRole.Manager, result.Value.Role);
+        Assert.Contains("Manager", result.Value.Roles);
     }
 
     [Fact]
@@ -34,19 +39,10 @@ public sealed class UserAdminServiceTests
     {
         await using var dbContext = CreateDbContext();
         var hasher = new Pbkdf2PasswordHasher();
-        dbContext.Users.Add(new ProjectResourceManagement.Server.Models.User
-        {
-            Id = 5,
-            FullName = "Employee",
-            Email = "employee@test.local",
-            Username = "employee",
-            PasswordHash = hasher.Hash("Temp@1234"),
-            Role = UserRole.Employee,
-            IsActive = true
-        });
+        SchemaV3TestHelpers.SeedUser(dbContext, 5, "employee", "Employee", "employee@test.local", UserRole.Employee);
         await dbContext.SaveChangesAsync();
 
-        var service = new UserAdminService(new UserRepository(dbContext), hasher);
+        var service = CreateService(dbContext, hasher);
         var result = await service.DeactivateUserAsync(5);
 
         Assert.True(result.Succeeded);
@@ -54,12 +50,20 @@ public sealed class UserAdminServiceTests
         Assert.False(user.IsActive);
     }
 
+    private static UserAdminService CreateService(ApplicationDbContext dbContext, Pbkdf2PasswordHasher hasher)
+    {
+        return new UserAdminService(
+            new UserRepository(dbContext),
+            new UserProfileRepository(dbContext),
+            new RbacRepository(dbContext),
+            hasher);
+    }
+
     private static ApplicationDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-
         return new ApplicationDbContext(options);
     }
 }

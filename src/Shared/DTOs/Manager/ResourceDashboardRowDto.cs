@@ -3,7 +3,7 @@ using ProjectResourceManagement.Shared.Enums;
 namespace ProjectResourceManagement.Shared.DTOs.Manager;
 
 public sealed record ResourceDashboardRowDto(
-    int EmployeeId,
+    int UserId,
     string FullName,
     string Department,
     string Designation,

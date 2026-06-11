@@ -37,7 +37,7 @@ public sealed class TimesheetServiceTests
         dbContext.Timesheets.Add(new Timesheet
         {
             Id = 9,
-            EmployeeId = 10,
+            UserId = 30,
             WeekStartDate = weekStart,
             TotalHours = 8,
             Status = TimesheetStatus.Submitted
@@ -97,42 +97,31 @@ public sealed class TimesheetServiceTests
 
         Assert.True(result.Succeeded);
         Assert.Single(result.Value!);
-        Assert.Equal("Employee One", result.Value![0].EmployeeName);
+        Assert.Equal("Employee One", result.Value![0].UserName);
     }
 
     private static async Task SeedTimesheetScenarioAsync(ApplicationDbContext dbContext)
     {
-        dbContext.Users.AddRange(
-            new User { Id = 2, FullName = "Manager", Email = "m@test", Username = "manager", PasswordHash = "h", Role = UserRole.Manager, IsActive = true },
-            new User { Id = 30, FullName = "Employee One", Email = "e1@test", Username = "emp1", PasswordHash = "h", Role = UserRole.Employee, IsActive = true });
+        SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "m@test", UserRole.Manager);
+        SchemaV3TestHelpers.SeedUser(dbContext, 30, "emp1", "Employee One", "e1@test", UserRole.Employee);
+        await dbContext.SaveChangesAsync();
+        dbContext.UserProfiles.Single(p => p.UserId == 30).ManagerUserId = 2;
 
         dbContext.Projects.Add(new Project
         {
             Id = 1,
             Name = "Apollo",
-            ManagerId = 2,
+            ManagerUserId = 2,
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-1)),
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6))
-        });
-
-        dbContext.Employees.Add(new Employee
-        {
-            Id = 10,
-            UserId = 30,
-            ManagerId = 2,
-            FullName = "Employee One",
-            Email = "e1@test",
-            Department = "Eng",
-            Designation = "SE",
-            IsActive = true
         });
 
         dbContext.Allocations.Add(new Allocation
         {
             Id = 1,
-            EmployeeId = 10,
+            UserId = 30,
             ProjectId = 1,
-            CreatedByManagerId = 2,
+            CreatedByUserId = 2,
             UtilizationPercentage = 50,
             FromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)),
             Status = AllocationStatus.Active
@@ -144,7 +133,7 @@ public sealed class TimesheetServiceTests
     private static TimesheetService CreateService(ApplicationDbContext dbContext)
     {
         return new TimesheetService(
-            new EmployeeRepository(dbContext),
+            new UserProfileRepository(dbContext),
             new AllocationRepository(dbContext),
             new TimesheetRepository(dbContext),
             new ActivityTagRepository(dbContext),

@@ -33,7 +33,7 @@ public sealed class ProjectHealthService(
         int managerUserId,
         CancellationToken cancellationToken = default)
     {
-        var projects = await projectRepository.ListByManagerIdAsync(managerUserId, cancellationToken);
+        var projects = await projectRepository.ListByManagerUserIdAsync(managerUserId, cancellationToken);
         var maxWeeklyHours = await GetMaxWeeklyHoursAsync(cancellationToken);
         var previousWeekStart = GetPreviousWeekStart(DateOnly.FromDateTime(DateTime.UtcNow));
         var mapped = new List<ManagerProjectHealthDto>();
@@ -224,22 +224,22 @@ public sealed class ProjectHealthService(
             return;
         }
 
-        var submittedEmployeeIds = await timesheetRepository.ListSubmittedEmployeeIdsForProjectWeekAsync(
+        var submittedUserIds = await timesheetRepository.ListSubmittedUserIdsForProjectWeekAsync(
             project.Id,
             previousWeekStart,
             cancellationToken);
 
-        var missingEmployees = weekAllocations
-            .Where(allocation => !submittedEmployeeIds.Contains(allocation.EmployeeId))
-            .Select(allocation => allocation.Employee.FullName)
+        var missingUsers = weekAllocations
+            .Where(allocation => !submittedUserIds.Contains(allocation.UserId))
+            .Select(allocation => allocation.User.Profile!.FullName)
             .Distinct()
             .ToList();
 
-        if (missingEmployees.Count > 0)
+        if (missingUsers.Count > 0)
         {
             signals.Add((
                 ProjectHealthStatus.Attention,
-                $"Missing previous-week timesheets from: {string.Join(", ", missingEmployees)}."));
+                $"Missing previous-week timesheets from: {string.Join(", ", missingUsers)}."));
         }
 
         if (expectedHours <= 0)

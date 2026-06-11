@@ -1,4 +1,4 @@
-using ProjectResourceManagement.Server.Models;
+﻿using ProjectResourceManagement.Server.Models;
 using ProjectResourceManagement.Server.Services.Ai.Facts;
 using ProjectResourceManagement.Server.Services.Ai.Filtering;
 using ProjectResourceManagement.Server.Services.Ai.Prompts;
@@ -16,13 +16,13 @@ public sealed class AiPromptBuilderTests
         {
             new()
             {
-                Employee = new Employee
+                Profile = new UserProfile
                 {
-                    Id = 10,
+                    UserId = 10,
                     FullName = "Alex Backend",
                     Department = "Engineering",
                     Designation = "Senior Developer",
-                    Status = EmployeeStatus.PartiallyAllocated,
+                    ResourceStatus = EmployeeStatus.PartiallyAllocated,
                     CurrentUtilizationPercent = 40
                 },
                 MatchScore = 7,
@@ -33,7 +33,7 @@ public sealed class AiPromptBuilderTests
         var prompt = builder.Build("need backend api developer", candidates);
 
         Assert.Contains("Pre-filtered direct-team candidates", prompt.UserPrompt);
-        Assert.Contains("EmployeeId=10", prompt.UserPrompt);
+        Assert.Contains("UserId=10", prompt.UserPrompt);
         Assert.Contains("Backend API Development", prompt.UserPrompt);
         Assert.Contains("Do not invent employees", prompt.SystemInstruction);
     }

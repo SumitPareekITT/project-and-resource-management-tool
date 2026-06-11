@@ -1,18 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Ai;
 using ProjectResourceManagement.Shared.DTOs.Ai;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/manager/ai")]
-[RequireRole(UserRole.Manager)]
 public sealed class ManagerAiController(AiAssistantService aiAssistantService) : ControllerBase
 {
     [HttpPost("skill-match")]
+    [RequirePermission(PermissionCodes.ManagerAiSkillMatch)]
     public async Task<IActionResult> MatchSkillsAsync(
         [FromBody] AiSkillMatchRequest request,
         CancellationToken cancellationToken)
@@ -27,6 +27,7 @@ public sealed class ManagerAiController(AiAssistantService aiAssistantService) :
     }
 
     [HttpPost("project-risk-summary")]
+    [RequirePermission(PermissionCodes.ManagerAiProjectRisk)]
     public async Task<IActionResult> SummarizeProjectRiskAsync(
         [FromBody] AiProjectRiskSummaryRequest request,
         CancellationToken cancellationToken)
@@ -43,10 +44,9 @@ public sealed class ManagerAiController(AiAssistantService aiAssistantService) :
     private bool TryGetManagerUserId(out int managerUserId, out IActionResult? errorResult)
     {
         managerUserId = 0;
-        if (!Request.Headers.TryGetValue("X-User-Id", out var rawUserId) ||
-            !int.TryParse(rawUserId.ToString(), out managerUserId))
+        if (!HttpContext.TryGetAuthenticatedUserId(out managerUserId, out var errorMessage))
         {
-            errorResult = Unauthorized(new { Message = "Missing or invalid X-User-Id header." });
+            errorResult = Unauthorized(new { Message = errorMessage });
             return false;
         }
 

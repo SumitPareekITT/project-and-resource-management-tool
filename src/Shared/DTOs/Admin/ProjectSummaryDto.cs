@@ -8,7 +8,7 @@ public sealed record ProjectSummaryDto(
     string ClientName,
     ProjectStatus Status,
     ProjectHealthStatus HealthStatus,
-    int ManagerId,
+    int ManagerUserId,
     string ManagerName,
     DateOnly StartDate,
     DateOnly EndDate,

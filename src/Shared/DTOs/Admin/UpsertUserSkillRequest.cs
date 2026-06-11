@@ -2,10 +2,8 @@ using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Shared.DTOs.Admin;
 
-public sealed record EmployeeSkillDto(
+public sealed record UpsertUserSkillRequest(
     int SkillId,
-    string SkillName,
-    SkillCategory Category,
     ProficiencyLevel ProficiencyLevel,
     decimal? YearsOfExperience,
     DateOnly? LastUsedOn);

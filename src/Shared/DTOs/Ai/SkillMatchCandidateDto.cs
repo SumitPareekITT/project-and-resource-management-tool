@@ -3,7 +3,7 @@ using ProjectResourceManagement.Shared.Enums;
 namespace ProjectResourceManagement.Shared.DTOs.Ai;
 
 public sealed record SkillMatchCandidateDto(
-    int EmployeeId,
+    int UserId,
     string FullName,
     string Department,
     string Designation,

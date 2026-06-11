@@ -9,9 +9,9 @@ public sealed class SkillMatchPromptBuilder
     {
         var candidateFacts = candidates
             .Select(candidate =>
-                $"EmployeeId={candidate.Employee.Id}; Name={candidate.Employee.FullName}; " +
-                $"Department={candidate.Employee.Department}; Designation={candidate.Employee.Designation}; " +
-                $"Status={candidate.Employee.Status}; Utilization={candidate.CurrentUtilizationPercent:0.##}%; " +
+                $"UserId={candidate.Profile.UserId}; Name={candidate.Profile.FullName}; " +
+                $"Department={candidate.Profile.Department}; Designation={candidate.Profile.Designation}; " +
+                $"Status={candidate.Profile.ResourceStatus}; Utilization={candidate.CurrentUtilizationPercent:0.##}%; " +
                 $"MatchScore={candidate.MatchScore}; Skills=[{string.Join(", ", candidate.MatchedSkills)}]")
             .ToList();
 

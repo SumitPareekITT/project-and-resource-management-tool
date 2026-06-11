@@ -5,10 +5,10 @@ namespace ProjectResourceManagement.Server.Services.Ai.Filtering;
 
 public sealed class SkillMatchCandidate
 {
-    public required Employee Employee { get; init; }
+    public required UserProfile Profile { get; init; }
     public int MatchScore { get; init; }
     public IReadOnlyList<string> MatchedSkills { get; init; } = [];
     public string DeterministicExplanation { get; init; } = string.Empty;
-    public EmployeeStatus Status => Employee.Status;
-    public decimal CurrentUtilizationPercent => Employee.CurrentUtilizationPercent;
+    public EmployeeStatus Status => Profile.ResourceStatus;
+    public decimal CurrentUtilizationPercent => Profile.CurrentUtilizationPercent;
 }

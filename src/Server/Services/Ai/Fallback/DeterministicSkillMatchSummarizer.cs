@@ -11,7 +11,7 @@ public sealed class DeterministicSkillMatchSummarizer
             return $"No available direct-team candidates matched '{query}'. Try broader skill keywords or check bench resources.";
         }
 
-        var topNames = string.Join(", ", candidates.Take(3).Select(candidate => candidate.Employee.FullName));
+        var topNames = string.Join(", ", candidates.Take(3).Select(candidate => candidate.Profile.FullName));
         return $"LLM provider is not configured. Returning deterministic pre-filter ranking for '{query}'. Top matches: {topNames}.";
     }
 }

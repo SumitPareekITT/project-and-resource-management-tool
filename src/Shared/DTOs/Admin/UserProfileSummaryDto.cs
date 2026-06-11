@@ -2,16 +2,17 @@ using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Shared.DTOs.Admin;
 
-public sealed record EmployeeSummaryDto(
-    int EmployeeId,
+public sealed record UserProfileSummaryDto(
+    int ProfileId,
     int UserId,
     string FullName,
     string Email,
     string Department,
     string Designation,
-    EmployeeStatus Status,
+    EmployeeStatus ResourceStatus,
     decimal CurrentUtilizationPercent,
     bool IsActive,
-    int? ManagerId,
+    int? ManagerUserId,
     string? ManagerName,
-    IReadOnlyList<EmployeeSkillDto> Skills);
+    IReadOnlyList<string> Roles,
+    IReadOnlyList<UserSkillDto> Skills);

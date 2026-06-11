@@ -17,7 +17,7 @@ public sealed class ProjectRiskFactAssembler(
         CancellationToken cancellationToken = default)
     {
         var project = await projectRepository.GetByIdAsync(projectId, cancellationToken);
-        if (project is null || project.ManagerId != managerUserId)
+        if (project is null || project.ManagerUserId != managerUserId)
         {
             return null;
         }
@@ -98,7 +98,7 @@ public sealed class ProjectRiskFactAssembler(
     {
         return allocations
             .Select(allocation =>
-                $"{allocation.Employee.FullName}: {allocation.UtilizationPercentage:0.##}% from {allocation.FromDate:yyyy-MM-dd} to {(allocation.ToDate?.ToString("yyyy-MM-dd") ?? "open")}")
+                $"{allocation.User.Profile!.FullName}: {allocation.UtilizationPercentage:0.##}% from {allocation.FromDate:yyyy-MM-dd} to {(allocation.ToDate?.ToString("yyyy-MM-dd") ?? "open")}")
             .ToList();
     }
 

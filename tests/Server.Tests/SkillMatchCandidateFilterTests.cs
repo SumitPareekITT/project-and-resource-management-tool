@@ -10,74 +10,63 @@ public sealed class SkillMatchCandidateFilterTests
     public void FilterDirectTeam_ReturnsOnlyAvailableTeamMembers_WithSkillMatches()
     {
         var filter = new SkillMatchCandidateFilter();
-        var team = new List<Employee>
+        var team = new List<UserProfile>
         {
-            CreateEmployee(
-                id: 1,
-                name: "Backend Dev",
-                utilization: 50,
-                status: EmployeeStatus.PartiallyAllocated,
-                skills: [("Backend API Development", SkillCategory.Backend, ProficiencyLevel.Advanced)]),
-            CreateEmployee(
-                id: 2,
-                name: "Fully Allocated",
-                utilization: 100,
-                status: EmployeeStatus.Allocated,
-                skills: [("Backend API Development", SkillCategory.Backend, ProficiencyLevel.Expert)]),
-            CreateEmployee(
-                id: 3,
-                name: "Frontend Dev",
-                utilization: 0,
-                status: EmployeeStatus.Bench,
-                skills: [("Frontend Development", SkillCategory.Frontend, ProficiencyLevel.Intermediate)])
+            CreateProfile(1, 101, "Backend Dev", 50, EmployeeStatus.PartiallyAllocated, [("Backend API Development", SkillCategory.Backend, ProficiencyLevel.Advanced)]),
+            CreateProfile(2, 102, "Fully Allocated", 100, EmployeeStatus.Allocated, [("Backend API Development", SkillCategory.Backend, ProficiencyLevel.Expert)]),
+            CreateProfile(3, 103, "Frontend Dev", 0, EmployeeStatus.Bench, [("Frontend Development", SkillCategory.Frontend, ProficiencyLevel.Intermediate)])
         };
 
         var result = filter.FilterDirectTeam(team, "backend api");
 
         Assert.Equal(2, result.Count);
-        Assert.Equal(1, result[0].Employee.Id);
+        Assert.Equal(101, result[0].Profile.UserId);
         Assert.Contains("Backend API Development", result[0].MatchedSkills[0]);
-        Assert.DoesNotContain(result, candidate => candidate.Employee.Id == 2);
+        Assert.DoesNotContain(result, candidate => candidate.Profile.UserId == 102);
     }
 
     [Fact]
     public void Tokenize_RemovesShortTokensAndDuplicates()
     {
         var tokens = SkillMatchQueryTokenizer.Tokenize("backend, API  api  q");
-
         Assert.Equal(["backend", "api"], tokens);
     }
 
-    private static Employee CreateEmployee(
-        int id,
+    private static UserProfile CreateProfile(
+        int profileId,
+        int userId,
         string name,
         decimal utilization,
-        EmployeeStatus status,
+        EmployeeStatus resourceStatus,
         IReadOnlyList<(string SkillName, SkillCategory Category, ProficiencyLevel Proficiency)> skills)
     {
-        return new Employee
+        var user = new User
         {
-            Id = id,
-            UserId = id + 100,
+            Id = userId,
+            Username = $"user{userId}",
+            PasswordHash = "hash",
+            IsActive = true,
+            Skills = skills.Select((skill, index) => new UserSkill
+            {
+                UserId = userId,
+                SkillId = index + 1,
+                ProficiencyLevel = skill.Proficiency,
+                Skill = new Skill { Id = index + 1, Name = skill.SkillName, Category = skill.Category }
+            }).ToList()
+        };
+
+        return new UserProfile
+        {
+            Id = profileId,
+            UserId = userId,
             FullName = name,
-            Email = $"{id}@test",
+            Email = $"{userId}@test",
             Department = "Engineering",
             Designation = "Developer",
             IsActive = true,
             CurrentUtilizationPercent = utilization,
-            Status = status,
-            Skills = skills.Select((skill, index) => new EmployeeSkill
-            {
-                EmployeeId = id,
-                SkillId = index + 1,
-                ProficiencyLevel = skill.Proficiency,
-                Skill = new Skill
-                {
-                    Id = index + 1,
-                    Name = skill.SkillName,
-                    Category = skill.Category
-                }
-            }).ToList()
+            ResourceStatus = resourceStatus,
+            User = user
         };
     }
 }

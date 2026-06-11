@@ -2,8 +2,8 @@ namespace ProjectResourceManagement.Shared.DTOs.Admin;
 
 public sealed record AllocationMatrixRowDto(
     int AllocationId,
-    int EmployeeId,
-    string EmployeeName,
+    int UserId,
+    string UserName,
     int ProjectId,
     string ProjectName,
     string ManagerName,

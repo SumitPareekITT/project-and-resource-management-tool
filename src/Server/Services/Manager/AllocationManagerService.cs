@@ -9,7 +9,7 @@ using ProjectResourceManagement.Shared.Enums;
 namespace ProjectResourceManagement.Server.Services.Manager;
 
 public sealed class AllocationManagerService(
-    EmployeeRepository employeeRepository,
+    UserProfileRepository userProfileRepository,
     ProjectRepository projectRepository,
     AllocationRepository allocationRepository,
     UtilizationComputationService utilizationComputationService)
@@ -18,13 +18,13 @@ public sealed class AllocationManagerService(
         int managerUserId,
         CancellationToken cancellationToken = default)
     {
-        var team = await employeeRepository.ListByManagerIdAsync(managerUserId, cancellationToken);
+        var team = await userProfileRepository.ListByManagerUserIdAsync(managerUserId, cancellationToken);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var rows = new List<ResourceDashboardRowDto>();
 
-        foreach (var employee in team.Where(member => member.IsActive))
+        foreach (var profile in team.Where(member => member.IsActive))
         {
-            var activeAllocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
+            var activeAllocations = await allocationRepository.ListActiveByUserIdAsync(profile.UserId, cancellationToken);
             var currentAllocations = activeAllocations
                 .Where(allocation => IsActiveOnDate(allocation, today))
                 .ToList();
@@ -35,10 +35,10 @@ public sealed class AllocationManagerService(
                 : string.Join(", ", currentAllocations.Select(allocation => $"{allocation.Project.Name} ({allocation.UtilizationPercentage:0.##}%)"));
 
             rows.Add(new ResourceDashboardRowDto(
-                employee.Id,
-                employee.FullName,
-                employee.Department,
-                employee.Designation,
+                profile.UserId,
+                profile.FullName,
+                profile.Department,
+                profile.Designation,
                 utilization,
                 MapDashboardCategory(utilization),
                 summary));
@@ -52,7 +52,7 @@ public sealed class AllocationManagerService(
         int managerUserId,
         CancellationToken cancellationToken = default)
     {
-        var projects = await projectRepository.ListByManagerIdAsync(managerUserId, cancellationToken);
+        var projects = await projectRepository.ListByManagerUserIdAsync(managerUserId, cancellationToken);
         var mapped = projects
             .Where(project => project.Status is ProjectStatus.Planned or ProjectStatus.Active)
             .Select(project => new ManagerProjectOptionDto(
@@ -92,25 +92,25 @@ public sealed class AllocationManagerService(
             return AdminResult<AllocationDetailDto>.Fail(AdminResultCode.NotFound, "Project was not found.");
         }
 
-        if (project.ManagerId != managerUserId)
+        if (project.ManagerUserId != managerUserId)
         {
             return AdminResult<AllocationDetailDto>.Fail(AdminResultCode.ValidationError, "You can allocate resources only to projects you own.");
         }
 
-        var employee = await employeeRepository.GetByIdAsync(request.EmployeeId, cancellationToken);
-        if (employee is null || !employee.IsActive)
+        var profile = await userProfileRepository.GetByUserIdAsync(request.UserId, cancellationToken);
+        if (profile is null || !profile.IsActive)
         {
-            return AdminResult<AllocationDetailDto>.Fail(AdminResultCode.NotFound, "Employee was not found or is inactive.");
+            return AdminResult<AllocationDetailDto>.Fail(AdminResultCode.NotFound, "User profile was not found or is inactive.");
         }
 
-        if (employee.ManagerId != managerUserId)
+        if (profile.ManagerUserId != managerUserId)
         {
             return AdminResult<AllocationDetailDto>.Fail(
                 AdminResultCode.ValidationError,
-                "You can allocate only employees assigned to your direct team.");
+                "You can allocate only team members assigned to your direct team.");
         }
 
-        var activeAllocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
+        var activeAllocations = await allocationRepository.ListActiveByUserIdAsync(profile.UserId, cancellationToken);
         var overlappingUtilization = activeAllocations
             .Where(allocation => DateRangesOverlap(allocation.FromDate, allocation.ToDate, request.FromDate, request.ToDate))
             .Sum(allocation => allocation.UtilizationPercentage);
@@ -124,9 +124,9 @@ public sealed class AllocationManagerService(
 
         var allocation = new Allocation
         {
-            EmployeeId = employee.Id,
+            UserId = profile.UserId,
             ProjectId = project.Id,
-            CreatedByManagerId = managerUserId,
+            CreatedByUserId = managerUserId,
             UtilizationPercentage = request.UtilizationPercentage,
             FromDate = request.FromDate,
             ToDate = request.ToDate,
@@ -135,8 +135,8 @@ public sealed class AllocationManagerService(
 
         await allocationRepository.AddAsync(allocation, cancellationToken);
         await allocationRepository.SaveChangesAsync(cancellationToken);
-        await utilizationComputationService.SyncEmployeeAsync(employee, cancellationToken);
-        await employeeRepository.SaveChangesAsync(cancellationToken);
+        await utilizationComputationService.SyncUserProfileAsync(profile, cancellationToken);
+        await userProfileRepository.SaveChangesAsync(cancellationToken);
 
         var created = await allocationRepository.GetByIdAsync(allocation.Id, cancellationToken);
         return AdminResult<AllocationDetailDto>.Success(MapAllocation(created!));
@@ -153,7 +153,7 @@ public sealed class AllocationManagerService(
             return AdminResult<AllocationDetailDto>.Fail(AdminResultCode.NotFound, "Allocation was not found.");
         }
 
-        if (allocation.Project.ManagerId != managerUserId)
+        if (allocation.Project.ManagerUserId != managerUserId)
         {
             return AdminResult<AllocationDetailDto>.Fail(
                 AdminResultCode.ValidationError,
@@ -172,8 +172,13 @@ public sealed class AllocationManagerService(
             allocation.ToDate = today;
         }
 
-        await utilizationComputationService.SyncEmployeeAsync(allocation.Employee, cancellationToken);
+        if (allocation.User.Profile is not null)
+        {
+            await utilizationComputationService.SyncUserProfileAsync(allocation.User.Profile, cancellationToken);
+        }
+
         await allocationRepository.SaveChangesAsync(cancellationToken);
+        await userProfileRepository.SaveChangesAsync(cancellationToken);
 
         return AdminResult<AllocationDetailDto>.Success(MapAllocation(allocation), "Allocation ended successfully.");
     }
@@ -214,10 +219,11 @@ public sealed class AllocationManagerService(
 
     private static AllocationDetailDto MapAllocation(Allocation allocation)
     {
+        var userName = allocation.User.Profile?.FullName ?? allocation.User.Username;
         return new AllocationDetailDto(
             allocation.Id,
-            allocation.EmployeeId,
-            allocation.Employee.FullName,
+            allocation.UserId,
+            userName,
             allocation.ProjectId,
             allocation.Project.Name,
             allocation.UtilizationPercentage,

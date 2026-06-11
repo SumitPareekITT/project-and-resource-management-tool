@@ -34,7 +34,7 @@ public sealed class PrmBackgroundScheduler(
             var utilizationService = scope.ServiceProvider.GetRequiredService<UtilizationComputationService>();
             var projectHealthService = scope.ServiceProvider.GetRequiredService<ProjectHealthService>();
 
-            var employeeCount = await utilizationService.SyncAllActiveEmployeesAsync(cancellationToken);
+            var employeeCount = await utilizationService.SyncAllActiveProfilesAsync(cancellationToken);
             var projectCount = await projectHealthService.EvaluateAndPersistAllProjectsAsync(cancellationToken);
 
             logger.LogInformation(

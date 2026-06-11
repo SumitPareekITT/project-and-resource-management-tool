@@ -1,8 +1,8 @@
 namespace ProjectResourceManagement.Shared.DTOs.Admin;
 
-public sealed record UpdateEmployeeProfileRequest(
+public sealed record UpdateUserProfileRequest(
     string FullName,
     string Email,
     string Department,
     string Designation,
-    int? ManagerId);
+    int? ManagerUserId);

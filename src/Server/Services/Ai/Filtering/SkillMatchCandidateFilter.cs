@@ -7,61 +7,61 @@ namespace ProjectResourceManagement.Server.Services.Ai.Filtering;
 public sealed class SkillMatchCandidateFilter
 {
     public IReadOnlyList<SkillMatchCandidate> FilterDirectTeam(
-        IReadOnlyList<Employee> directTeamMembers,
+        IReadOnlyList<UserProfile> directTeamMembers,
         string naturalLanguageQuery)
     {
         var queryTokens = SkillMatchQueryTokenizer.Tokenize(naturalLanguageQuery);
 
         return directTeamMembers
-            .Where(employee => employee.IsActive)
-            .Where(employee => employee.CurrentUtilizationPercent < BusinessRules.FullAllocationPercent)
-            .Select(employee => ScoreEmployee(employee, queryTokens))
+            .Where(profile => profile.IsActive)
+            .Where(profile => profile.CurrentUtilizationPercent < BusinessRules.FullAllocationPercent)
+            .Select(profile => ScoreProfile(profile, queryTokens))
             .Where(candidate => candidate.MatchScore > 0 || queryTokens.Count == 0)
             .OrderByDescending(candidate => candidate.MatchScore)
             .ThenBy(candidate => candidate.CurrentUtilizationPercent)
-            .ThenBy(candidate => candidate.Employee.FullName)
+            .ThenBy(candidate => candidate.Profile.FullName)
             .Take(10)
             .ToList();
     }
 
-    private static SkillMatchCandidate ScoreEmployee(Employee employee, IReadOnlyList<string> queryTokens)
+    private static SkillMatchCandidate ScoreProfile(UserProfile profile, IReadOnlyList<string> queryTokens)
     {
         var matchedSkills = new List<string>();
         var score = 0;
 
-        foreach (var employeeSkill in employee.Skills)
+        foreach (var userSkill in profile.User.Skills)
         {
-            var skillName = employeeSkill.Skill.Name;
-            var categoryName = employeeSkill.Skill.Category.ToString();
+            var skillName = userSkill.Skill.Name;
+            var categoryName = userSkill.Skill.Category.ToString();
 
             if (queryTokens.Count == 0)
             {
-                matchedSkills.Add($"{skillName} ({employeeSkill.ProficiencyLevel})");
-                score += MapProficiencyScore(employeeSkill.ProficiencyLevel);
+                matchedSkills.Add($"{skillName} ({userSkill.ProficiencyLevel})");
+                score += MapProficiencyScore(userSkill.ProficiencyLevel);
                 continue;
             }
 
             if (QueryMatchesSkill(queryTokens, skillName, categoryName))
             {
-                matchedSkills.Add($"{skillName} ({employeeSkill.ProficiencyLevel})");
-                score += MapProficiencyScore(employeeSkill.ProficiencyLevel) + 2;
+                matchedSkills.Add($"{skillName} ({userSkill.ProficiencyLevel})");
+                score += MapProficiencyScore(userSkill.ProficiencyLevel) + 2;
             }
         }
 
         if (queryTokens.Count > 0)
         {
-            if (queryTokens.Any(token => employee.Department.Contains(token, StringComparison.OrdinalIgnoreCase)))
+            if (queryTokens.Any(token => profile.Department.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {
                 score += 1;
             }
 
-            if (queryTokens.Any(token => employee.Designation.Contains(token, StringComparison.OrdinalIgnoreCase)))
+            if (queryTokens.Any(token => profile.Designation.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {
                 score += 1;
             }
         }
 
-        score += employee.Status switch
+        score += profile.ResourceStatus switch
         {
             EmployeeStatus.Bench => 3,
             EmployeeStatus.PartiallyAllocated => 2,
@@ -70,10 +70,10 @@ public sealed class SkillMatchCandidateFilter
 
         return new SkillMatchCandidate
         {
-            Employee = employee,
+            Profile = profile,
             MatchScore = score,
             MatchedSkills = matchedSkills,
-            DeterministicExplanation = BuildDeterministicExplanation(employee, matchedSkills, score)
+            DeterministicExplanation = BuildDeterministicExplanation(profile, matchedSkills, score)
         };
     }
 
@@ -96,7 +96,7 @@ public sealed class SkillMatchCandidateFilter
     }
 
     private static string BuildDeterministicExplanation(
-        Employee employee,
+        UserProfile profile,
         IReadOnlyList<string> matchedSkills,
         int score)
     {
@@ -104,7 +104,7 @@ public sealed class SkillMatchCandidateFilter
             ? "no direct skill keyword match"
             : string.Join(", ", matchedSkills);
 
-        return $"{employee.FullName} scored {score} based on skills ({skillsText}), " +
-               $"status {employee.Status}, and utilization {employee.CurrentUtilizationPercent:0.##}%.";
+        return $"{profile.FullName} scored {score} based on skills ({skillsText}), " +
+               $"status {profile.ResourceStatus}, and utilization {profile.CurrentUtilizationPercent:0.##}%.";
     }
 }

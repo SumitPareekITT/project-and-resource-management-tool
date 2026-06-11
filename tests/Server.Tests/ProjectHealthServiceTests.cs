@@ -14,6 +14,7 @@ public sealed class ProjectHealthServiceTests
     public async Task EvaluateAndPersistAllProjectsAsync_SetsAtRisk_ForOverdueMilestone()
     {
         await using var dbContext = CreateDbContext();
+        SeedManagerUser(dbContext);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var project = CreateActiveProject(today);
         project.Milestones.Add(new Milestone
@@ -114,25 +115,15 @@ public sealed class ProjectHealthServiceTests
             Status = MilestoneStatus.InProgress
         });
         dbContext.Projects.Add(project);
-
-        dbContext.Employees.Add(new Employee
-        {
-            Id = 10,
-            UserId = 20,
-            ManagerId = 2,
-            FullName = "Employee One",
-            Email = "e1@test",
-            Department = "Eng",
-            Designation = "SE",
-            IsActive = true
-        });
-
-        dbContext.Allocations.Add(new Allocation
+        SchemaV3TestHelpers.SeedUser(dbContext, 20, "emp20", "Employee One", "e1@test", UserRole.Employee);
+        await dbContext.SaveChangesAsync();
+        dbContext.UserProfiles.Single(p => p.UserId == 20).ManagerUserId = 2;
+dbContext.Allocations.Add(new Allocation
         {
             Id = 1,
-            EmployeeId = 10,
+            UserId = 20,
             ProjectId = 1,
-            CreatedByManagerId = 2,
+            CreatedByUserId = 2,
             UtilizationPercentage = 50,
             FromDate = today.AddDays(-14),
             Status = AllocationStatus.Active
@@ -142,7 +133,7 @@ public sealed class ProjectHealthServiceTests
         dbContext.Timesheets.Add(new Timesheet
         {
             Id = 1,
-            EmployeeId = 10,
+            UserId = 20,
             WeekStartDate = previousWeek,
             TotalHours = 20,
             Status = TimesheetStatus.Submitted
@@ -166,16 +157,7 @@ public sealed class ProjectHealthServiceTests
 
     private static void SeedManagerUser(ApplicationDbContext dbContext)
     {
-        dbContext.Users.Add(new User
-        {
-            Id = 2,
-            FullName = "Manager",
-            Email = "m@test",
-            Username = "manager",
-            PasswordHash = "h",
-            Role = UserRole.Manager,
-            IsActive = true
-        });
+        SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "m@test", UserRole.Manager);
     }
 
     private static Project CreateActiveProject(DateOnly today)
@@ -184,7 +166,7 @@ public sealed class ProjectHealthServiceTests
         {
             Id = 1,
             Name = "Apollo",
-            ManagerId = 2,
+            ManagerUserId = 2,
             StartDate = today.AddMonths(-1),
             EndDate = today.AddMonths(6),
             Status = ProjectStatus.Active
