@@ -7,7 +7,11 @@ using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Services.Admin;
 
-public sealed class UserAdminService(UserRepository userRepository, IPasswordHasher passwordHasher)
+public sealed class UserAdminService(
+    UserRepository userRepository,
+    UserProfileRepository userProfileRepository,
+    RbacRepository rbacRepository,
+    IPasswordHasher passwordHasher)
 {
     public async Task<AdminResult<IReadOnlyList<UserSummaryDto>>> ListUsersAsync(CancellationToken cancellationToken = default)
     {
@@ -32,26 +36,47 @@ public sealed class UserAdminService(UserRepository userRepository, IPasswordHas
             return AdminResult<UserSummaryDto>.Fail(AdminResultCode.Conflict, "Username already exists.");
         }
 
-        if (await userRepository.GetByEmailAsync(email, cancellationToken) is not null)
+        if (await userProfileRepository.GetByEmailAsync(email, cancellationToken) is not null)
         {
             return AdminResult<UserSummaryDto>.Fail(AdminResultCode.Conflict, "Email already exists.");
         }
 
+        var role = await rbacRepository.GetRoleByNameAsync(request.Role.ToString(), cancellationToken);
+        if (role is null)
+        {
+            return AdminResult<UserSummaryDto>.Fail(AdminResultCode.ValidationError, "Role is not configured in the database.");
+        }
+
         var user = new User
         {
-            FullName = request.FullName.Trim(),
-            Email = email,
             Username = username,
             PasswordHash = passwordHasher.Hash(request.TemporaryPassword),
-            Role = request.Role,
             ForcePasswordChange = true,
             IsActive = true
         };
 
+        var profile = new UserProfile
+        {
+            User = user,
+            FullName = request.FullName.Trim(),
+            Email = email,
+            Department = request.Department.Trim(),
+            Designation = request.Designation.Trim(),
+            ManagerUserId = request.ManagerUserId,
+            ResourceStatus = request.Role == UserRole.Admin ? EmployeeStatus.Inactive : EmployeeStatus.Bench,
+            CurrentUtilizationPercent = 0,
+            IsActive = true
+        };
+
         await userRepository.AddAsync(user, cancellationToken);
+        await userProfileRepository.AddAsync(profile, cancellationToken);
         await userRepository.SaveChangesAsync(cancellationToken);
 
-        return AdminResult<UserSummaryDto>.Success(MapUser(user));
+        await rbacRepository.AssignRoleAsync(user.Id, role.Id, cancellationToken);
+        await rbacRepository.SaveChangesAsync(cancellationToken);
+
+        var created = await userRepository.GetByIdAsync(user.Id, cancellationToken);
+        return AdminResult<UserSummaryDto>.Success(MapUser(created!));
     }
 
     public async Task<AdminResult<UserSummaryDto>> ResetPasswordAsync(
@@ -94,9 +119,39 @@ public sealed class UserAdminService(UserRepository userRepository, IPasswordHas
 
         user.IsActive = false;
         user.DeactivatedAtUtc = DateTime.UtcNow;
-        await userRepository.SaveChangesAsync(cancellationToken);
+        if (user.Profile is not null)
+        {
+            user.Profile.IsActive = false;
+            user.Profile.DeactivatedAtUtc = user.DeactivatedAtUtc;
+        }
 
+        await userRepository.SaveChangesAsync(cancellationToken);
         return AdminResult<UserSummaryDto>.Success(MapUser(user), "User deactivated successfully.");
+    }
+
+    public async Task<AdminResult<UserSummaryDto>> ReactivateUserAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await userRepository.GetByIdAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            return AdminResult<UserSummaryDto>.Fail(AdminResultCode.NotFound, "User was not found.");
+        }
+
+        if (user.IsActive)
+        {
+            return AdminResult<UserSummaryDto>.Success(MapUser(user), "User is already active.");
+        }
+
+        user.IsActive = true;
+        user.DeactivatedAtUtc = null;
+        if (user.Profile is not null)
+        {
+            user.Profile.IsActive = true;
+            user.Profile.DeactivatedAtUtc = null;
+        }
+
+        await userRepository.SaveChangesAsync(cancellationToken);
+        return AdminResult<UserSummaryDto>.Success(MapUser(user), "User reactivated successfully.");
     }
 
     private static AdminResult<UserSummaryDto>? ValidateCreateRequest(CreateUserRequest request)
@@ -116,6 +171,16 @@ public sealed class UserAdminService(UserRepository userRepository, IPasswordHas
             return AdminResult<UserSummaryDto>.Fail(AdminResultCode.ValidationError, "Username is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(request.Department))
+        {
+            return AdminResult<UserSummaryDto>.Fail(AdminResultCode.ValidationError, "Department is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Designation))
+        {
+            return AdminResult<UserSummaryDto>.Fail(AdminResultCode.ValidationError, "Designation is required.");
+        }
+
         if (request.TemporaryPassword.Length < BusinessRules.MinimumPasswordLength)
         {
             return AdminResult<UserSummaryDto>.Fail(
@@ -133,12 +198,17 @@ public sealed class UserAdminService(UserRepository userRepository, IPasswordHas
 
     private static UserSummaryDto MapUser(User user)
     {
+        var roles = user.RoleAssignments
+            .Select(assignment => assignment.Role.RoleName)
+            .OrderBy(name => name)
+            .ToList();
+
         return new UserSummaryDto(
             user.Id,
-            user.FullName,
-            user.Email,
+            user.Profile?.FullName ?? user.Username,
+            user.Profile?.Email ?? string.Empty,
             user.Username,
-            user.Role,
+            roles,
             user.ForcePasswordChange,
             user.IsActive);
     }

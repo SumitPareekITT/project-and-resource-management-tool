@@ -6,5 +6,5 @@ public sealed record CreateProjectRequest(
     string Description,
     DateOnly StartDate,
     DateOnly EndDate,
-    int ManagerId,
+    int ManagerUserId,
     int TotalStoryPoints);

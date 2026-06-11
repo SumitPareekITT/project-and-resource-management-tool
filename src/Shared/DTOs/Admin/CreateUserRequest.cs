@@ -7,4 +7,7 @@ public sealed record CreateUserRequest(
     string Email,
     string Username,
     string TemporaryPassword,
-    UserRole Role);
+    UserRole Role,
+    string Department,
+    string Designation,
+    int? ManagerUserId);

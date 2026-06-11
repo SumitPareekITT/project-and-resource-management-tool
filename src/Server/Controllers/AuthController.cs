@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services;
 using ProjectResourceManagement.Shared.DTOs.Auth;
 
@@ -9,6 +11,7 @@ namespace ProjectResourceManagement.Server.Controllers;
 public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<IActionResult> LoginAsync([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await authService.LoginAsync(request, cancellationToken);
@@ -16,9 +19,15 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     }
 
     [HttpPost("change-password")]
+    [Authorize]
     public async Task<IActionResult> ChangePasswordAsync([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
-        var result = await authService.ChangePasswordAsync(request, cancellationToken);
+        if (!HttpContext.TryGetAuthenticatedUserId(out var userId, out var errorMessage))
+        {
+            return Unauthorized(new { Message = errorMessage });
+        }
+
+        var result = await authService.ChangePasswordAsync(userId, request, cancellationToken);
         return ToActionResult(result);
     }
 

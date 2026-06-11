@@ -12,12 +12,12 @@ public sealed class Project
     public DateOnly EndDate { get; set; }
     public ProjectStatus Status { get; set; } = ProjectStatus.Planned;
     public ProjectHealthStatus HealthStatus { get; set; } = ProjectHealthStatus.OnTrack;
-    public int ManagerId { get; set; }
+    public int ManagerUserId { get; set; }
     public int TotalStoryPoints { get; set; }
     public int CompletedStoryPoints { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
-    public User Manager { get; set; } = null!;
+    public User ManagerUser { get; set; } = null!;
     public ICollection<Milestone> Milestones { get; set; } = new List<Milestone>();
     public ICollection<Allocation> Allocations { get; set; } = new List<Allocation>();
     public ICollection<TimesheetEntry> TimesheetEntries { get; set; } = new List<TimesheetEntry>();

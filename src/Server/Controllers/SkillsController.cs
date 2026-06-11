@@ -1,17 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Shared.DTOs.Admin;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/skills")]
-[RequireRole(UserRole.Admin)]
 public sealed class SkillsController(SkillAdminService skillAdminService) : ControllerBase
 {
     [HttpGet]
+    [RequirePermission(PermissionCodes.SkillsList)]
     public async Task<IActionResult> ListAsync(CancellationToken cancellationToken)
     {
         var result = await skillAdminService.ListSkillsAsync(cancellationToken);
@@ -19,6 +19,7 @@ public sealed class SkillsController(SkillAdminService skillAdminService) : Cont
     }
 
     [HttpPost]
+    [RequirePermission(PermissionCodes.SkillsCreate)]
     public async Task<IActionResult> CreateAsync([FromBody] UpsertSkillRequest request, CancellationToken cancellationToken)
     {
         var result = await skillAdminService.CreateSkillAsync(request, cancellationToken);
@@ -26,6 +27,7 @@ public sealed class SkillsController(SkillAdminService skillAdminService) : Cont
     }
 
     [HttpPut("{id:int}")]
+    [RequirePermission(PermissionCodes.SkillsUpdate)]
     public async Task<IActionResult> UpdateAsync(int id, [FromBody] UpsertSkillRequest request, CancellationToken cancellationToken)
     {
         var result = await skillAdminService.UpdateSkillAsync(id, request, cancellationToken);
@@ -33,6 +35,7 @@ public sealed class SkillsController(SkillAdminService skillAdminService) : Cont
     }
 
     [HttpPut("{id:int}/deactivate")]
+    [RequirePermission(PermissionCodes.SkillsDeactivate)]
     public async Task<IActionResult> DeactivateAsync(int id, CancellationToken cancellationToken)
     {
         var result = await skillAdminService.DeactivateSkillAsync(id, cancellationToken);

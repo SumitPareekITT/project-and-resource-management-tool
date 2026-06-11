@@ -40,7 +40,7 @@ public sealed class ProjectAdminServiceTests
         {
             Id = 10,
             Name = "Apollo",
-            ManagerId = 2,
+            ManagerUserId = 2,
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             TotalStoryPoints = 0,
@@ -68,29 +68,20 @@ public sealed class ProjectAdminServiceTests
     {
         await using var dbContext = CreateDbContext();
         await SeedManagerAsync(dbContext);
-        dbContext.Employees.Add(new Employee
-        {
-            Id = 1,
-            UserId = 3,
-            FullName = "Dev One",
-            Email = "dev@test.local",
-            Department = "Eng",
-            Designation = "SE"
-        });
-        dbContext.Projects.Add(new Project
+dbContext.Projects.Add(new Project
         {
             Id = 1,
             Name = "Apollo",
-            ManagerId = 2,
+            ManagerUserId = 2,
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3))
         });
         dbContext.Allocations.Add(new Allocation
         {
             Id = 1,
-            EmployeeId = 1,
+            UserId = 3,
             ProjectId = 1,
-            CreatedByManagerId = 2,
+            CreatedByUserId = 2,
             UtilizationPercentage = 50,
             FromDate = DateOnly.FromDateTime(DateTime.UtcNow),
             Status = AllocationStatus.Active
@@ -107,37 +98,14 @@ public sealed class ProjectAdminServiceTests
 
     private static async Task SeedManagerAsync(ApplicationDbContext dbContext)
     {
-        dbContext.Users.AddRange(
-            new User
-            {
-                Id = 2,
-                FullName = "Manager",
-                Email = "manager@test.local",
-                Username = "manager",
-                PasswordHash = "hash",
-                Role = UserRole.Manager,
-                IsActive = true
-            },
-            new User
-            {
-                Id = 3,
-                FullName = "Employee",
-                Email = "employee@test.local",
-                Username = "employee",
-                PasswordHash = "hash",
-                Role = UserRole.Employee,
-                IsActive = true
-            });
+        SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "manager@test.local", UserRole.Manager);
+        SchemaV3TestHelpers.SeedUser(dbContext, 3, "employee", "Employee", "employee@test.local", UserRole.Employee);
         await dbContext.SaveChangesAsync();
     }
 
     private static ProjectAdminService CreateService(ApplicationDbContext dbContext)
     {
-        return new ProjectAdminService(
-            new ProjectRepository(dbContext),
-            new MilestoneRepository(dbContext),
-            new UserRepository(dbContext),
-            new AllocationRepository(dbContext));
+        return new ProjectAdminService(new ProjectRepository(dbContext), new MilestoneRepository(dbContext), new UserRepository(dbContext), new RbacRepository(dbContext), new AllocationRepository(dbContext));
     }
 
     private static ApplicationDbContext CreateDbContext()

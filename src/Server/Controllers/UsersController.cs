@@ -1,17 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services.Admin;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Shared.DTOs.Admin;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/users")]
-[RequireRole(UserRole.Admin)]
 public sealed class UsersController(UserAdminService userAdminService) : ControllerBase
 {
     [HttpGet]
+    [RequirePermission(PermissionCodes.UsersList)]
     public async Task<IActionResult> ListAsync(CancellationToken cancellationToken)
     {
         var result = await userAdminService.ListUsersAsync(cancellationToken);
@@ -19,6 +19,7 @@ public sealed class UsersController(UserAdminService userAdminService) : Control
     }
 
     [HttpPost]
+    [RequirePermission(PermissionCodes.UsersCreate)]
     public async Task<IActionResult> CreateAsync([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
     {
         var result = await userAdminService.CreateUserAsync(request, cancellationToken);
@@ -26,6 +27,7 @@ public sealed class UsersController(UserAdminService userAdminService) : Control
     }
 
     [HttpPut("{userId:int}/reset-password")]
+    [RequirePermission(PermissionCodes.UsersResetPassword)]
     public async Task<IActionResult> ResetPasswordAsync(
         int userId,
         [FromBody] ResetUserPasswordRequest request,
@@ -36,9 +38,18 @@ public sealed class UsersController(UserAdminService userAdminService) : Control
     }
 
     [HttpPut("{userId:int}/deactivate")]
+    [RequirePermission(PermissionCodes.UsersDeactivate)]
     public async Task<IActionResult> DeactivateAsync(int userId, CancellationToken cancellationToken)
     {
         var result = await userAdminService.DeactivateUserAsync(userId, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPut("{userId:int}/reactivate")]
+    [RequirePermission(PermissionCodes.UsersReactivate)]
+    public async Task<IActionResult> ReactivateAsync(int userId, CancellationToken cancellationToken)
+    {
+        var result = await userAdminService.ReactivateUserAsync(userId, cancellationToken);
         return ToActionResult(result);
     }
 

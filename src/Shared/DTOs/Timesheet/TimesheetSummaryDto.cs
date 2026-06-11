@@ -4,8 +4,8 @@ namespace ProjectResourceManagement.Shared.DTOs.Timesheet;
 
 public sealed record TimesheetSummaryDto(
     int TimesheetId,
-    int EmployeeId,
-    string EmployeeName,
+    int UserId,
+    string UserName,
     DateOnly WeekStartDate,
     decimal TotalHours,
     TimesheetStatus Status,

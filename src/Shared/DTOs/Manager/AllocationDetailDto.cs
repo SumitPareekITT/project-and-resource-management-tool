@@ -4,8 +4,8 @@ namespace ProjectResourceManagement.Shared.DTOs.Manager;
 
 public sealed record AllocationDetailDto(
     int AllocationId,
-    int EmployeeId,
-    string EmployeeName,
+    int UserId,
+    string UserName,
     int ProjectId,
     string ProjectName,
     decimal UtilizationPercentage,

@@ -8,25 +8,27 @@ public sealed class UserRepository(ApplicationDbContext dbContext)
     public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return dbContext.Users
-            .Include(user => user.EmployeeProfile)
+            .Include(user => user.Profile)
+            .Include(user => user.RoleAssignments)
+            .ThenInclude(assignment => assignment.Role)
             .FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
     public Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
         return dbContext.Users
+            .Include(user => user.Profile)
+            .Include(user => user.RoleAssignments)
+            .ThenInclude(assignment => assignment.Role)
             .FirstOrDefaultAsync(user => user.Username == username, cancellationToken);
-    }
-
-    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        return dbContext.Users
-            .FirstOrDefaultAsync(user => user.Email == email, cancellationToken);
     }
 
     public Task<List<User>> ListAsync(CancellationToken cancellationToken = default)
     {
         return dbContext.Users
+            .Include(user => user.Profile)
+            .Include(user => user.RoleAssignments)
+            .ThenInclude(assignment => assignment.Role)
             .OrderBy(user => user.Username)
             .ToListAsync(cancellationToken);
     }

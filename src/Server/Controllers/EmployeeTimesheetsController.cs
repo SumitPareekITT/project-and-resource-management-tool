@@ -1,18 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Timesheets;
 using ProjectResourceManagement.Shared.DTOs.Timesheet;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/employee")]
-[RequireRole(UserRole.Employee)]
 public sealed class EmployeeTimesheetsController(TimesheetService timesheetService) : ControllerBase
 {
     [HttpGet("timesheets/active-projects")]
+    [RequirePermission(PermissionCodes.EmployeeTimesheetsSubmit)]
     public async Task<IActionResult> GetActiveProjectsAsync([FromQuery] DateOnly weekStartDate, CancellationToken cancellationToken)
     {
         if (!TryGetEmployeeUserId(out var employeeUserId, out var errorResult))
@@ -25,6 +25,7 @@ public sealed class EmployeeTimesheetsController(TimesheetService timesheetServi
     }
 
     [HttpPost("timesheets")]
+    [RequirePermission(PermissionCodes.EmployeeTimesheetsSubmit)]
     public async Task<IActionResult> SubmitAsync([FromBody] SubmitTimesheetRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetEmployeeUserId(out var employeeUserId, out var errorResult))
@@ -37,6 +38,7 @@ public sealed class EmployeeTimesheetsController(TimesheetService timesheetServi
     }
 
     [HttpGet("timesheets")]
+    [RequirePermission(PermissionCodes.EmployeeTimesheetsHistory)]
     public async Task<IActionResult> ListAsync(CancellationToken cancellationToken)
     {
         if (!TryGetEmployeeUserId(out var employeeUserId, out var errorResult))
@@ -49,6 +51,7 @@ public sealed class EmployeeTimesheetsController(TimesheetService timesheetServi
     }
 
     [HttpGet("timesheets/{weekStartDate}")]
+    [RequirePermission(PermissionCodes.EmployeeTimesheetsView)]
     public async Task<IActionResult> GetByWeekAsync(DateOnly weekStartDate, CancellationToken cancellationToken)
     {
         if (!TryGetEmployeeUserId(out var employeeUserId, out var errorResult))
@@ -61,6 +64,7 @@ public sealed class EmployeeTimesheetsController(TimesheetService timesheetServi
     }
 
     [HttpGet("allocations")]
+    [RequirePermission(PermissionCodes.EmployeeAllocationsView)]
     public async Task<IActionResult> ListAllocationsAsync(CancellationToken cancellationToken)
     {
         if (!TryGetEmployeeUserId(out var employeeUserId, out var errorResult))
@@ -72,13 +76,33 @@ public sealed class EmployeeTimesheetsController(TimesheetService timesheetServi
         return ToActionResult(result);
     }
 
+    [HttpGet("activity-tags")]
+    [RequirePermission(PermissionCodes.EmployeeActivityTagsList)]
+    public async Task<IActionResult> ListActivityTagsAsync(CancellationToken cancellationToken)
+    {
+        var result = await timesheetService.ListActivityTagsAsync(cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpGet("timesheets/missing-reminder")]
+    [RequirePermission(PermissionCodes.EmployeeMissingReminder)]
+    public async Task<IActionResult> GetMissingTimesheetReminderAsync(CancellationToken cancellationToken)
+    {
+        if (!TryGetEmployeeUserId(out var employeeUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await timesheetService.GetEmployeeMissingTimesheetReminderAsync(employeeUserId, cancellationToken);
+        return ToActionResult(result);
+    }
+
     private bool TryGetEmployeeUserId(out int employeeUserId, out IActionResult? errorResult)
     {
         employeeUserId = 0;
-        if (!Request.Headers.TryGetValue("X-User-Id", out var rawUserId) ||
-            !int.TryParse(rawUserId.ToString(), out employeeUserId))
+        if (!HttpContext.TryGetAuthenticatedUserId(out employeeUserId, out var errorMessage))
         {
-            errorResult = Unauthorized(new { Message = "Missing or invalid X-User-Id header." });
+            errorResult = Unauthorized(new { Message = errorMessage });
             return false;
         }
 

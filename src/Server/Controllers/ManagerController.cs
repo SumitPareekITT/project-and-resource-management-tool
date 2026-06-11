@@ -1,24 +1,24 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Server.Services.Manager;
 using ProjectResourceManagement.Server.Services.Scheduling;
 using ProjectResourceManagement.Server.Services.Timesheets;
 using ProjectResourceManagement.Shared.DTOs.Manager;
 using ProjectResourceManagement.Shared.DTOs.Timesheet;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/manager")]
-[RequireRole(UserRole.Manager)]
 public sealed class ManagerController(
     AllocationManagerService allocationManagerService,
     ProjectHealthService projectHealthService,
     TimesheetService timesheetService) : ControllerBase
 {
     [HttpGet("dashboard")]
+    [RequirePermission(PermissionCodes.ManagerDashboardView)]
     public async Task<IActionResult> GetDashboardAsync(CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -31,6 +31,7 @@ public sealed class ManagerController(
     }
 
     [HttpGet("projects")]
+    [RequirePermission(PermissionCodes.ManagerProjectsList)]
     public async Task<IActionResult> ListProjectsAsync(CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -43,6 +44,7 @@ public sealed class ManagerController(
     }
 
     [HttpGet("projects/health")]
+    [RequirePermission(PermissionCodes.ManagerProjectsList)]
     public async Task<IActionResult> ListProjectHealthAsync(CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -55,6 +57,7 @@ public sealed class ManagerController(
     }
 
     [HttpPost("allocations")]
+    [RequirePermission(PermissionCodes.ManagerAllocationsCreate)]
     public async Task<IActionResult> AllocateAsync([FromBody] CreateAllocationRequest request, CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -67,6 +70,7 @@ public sealed class ManagerController(
     }
 
     [HttpPut("allocations/{allocationId:int}/end")]
+    [RequirePermission(PermissionCodes.ManagerAllocationsEnd)]
     public async Task<IActionResult> EndAllocationAsync(int allocationId, CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -79,6 +83,7 @@ public sealed class ManagerController(
     }
 
     [HttpGet("timesheets")]
+    [RequirePermission(PermissionCodes.ManagerTimesheetsList)]
     public async Task<IActionResult> ListTeamTimesheetsAsync(CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -91,6 +96,7 @@ public sealed class ManagerController(
     }
 
     [HttpGet("timesheets/missing")]
+    [RequirePermission(PermissionCodes.ManagerTimesheetsList)]
     public async Task<IActionResult> GetMissingTimesheetsAsync([FromQuery] DateOnly? weekStartDate, CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -103,6 +109,7 @@ public sealed class ManagerController(
     }
 
     [HttpGet("timesheets/{timesheetId:int}")]
+    [RequirePermission(PermissionCodes.ManagerTimesheetsView)]
     public async Task<IActionResult> GetTeamTimesheetAsync(int timesheetId, CancellationToken cancellationToken)
     {
         if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
@@ -117,10 +124,9 @@ public sealed class ManagerController(
     private bool TryGetManagerUserId(out int managerUserId, out IActionResult? errorResult)
     {
         managerUserId = 0;
-        if (!Request.Headers.TryGetValue("X-User-Id", out var rawUserId) ||
-            !int.TryParse(rawUserId.ToString(), out managerUserId))
+        if (!HttpContext.TryGetAuthenticatedUserId(out managerUserId, out var errorMessage))
         {
-            errorResult = Unauthorized(new { Message = "Missing or invalid X-User-Id header." });
+            errorResult = Unauthorized(new { Message = errorMessage });
             return false;
         }
 

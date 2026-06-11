@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using ProjectResourceManagement.Client.Ui;
 
 namespace ProjectResourceManagement.Client;
 
@@ -13,7 +14,7 @@ internal static class ApiHelper
         }
 
         var content = await response.Content.ReadAsStringAsync();
-        Console.WriteLine($"Request failed: {(int)response.StatusCode} {response.StatusCode}");
+        ConsoleScreen.ShowError($"Request failed: {(int)response.StatusCode} {response.StatusCode}");
 
         if (!string.IsNullOrWhiteSpace(content))
         {
@@ -22,7 +23,7 @@ internal static class ApiHelper
                 using var document = JsonDocument.Parse(content);
                 if (document.RootElement.TryGetProperty("message", out var message))
                 {
-                    Console.WriteLine(message.GetString());
+                    ConsoleScreen.ShowError(message.GetString() ?? "Unknown error.");
                     return false;
                 }
             }
@@ -31,7 +32,7 @@ internal static class ApiHelper
                 // Fall through to raw content output.
             }
 
-            Console.WriteLine(content);
+            ConsoleScreen.ShowInfo(content);
         }
 
         return false;

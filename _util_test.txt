@@ -1,0 +1,42 @@
+﻿    [Fact]
+    public async Task SyncAllActiveProfilesAsync_ResetsUtilization_WhenAllocationEnded()
+    {
+        await using var dbContext = CreateDbContext();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "m@test", UserRole.Manager);
+        SchemaV3TestHelpers.SeedUser(dbContext, 20, "emp20", "Employee One", "e1@test", UserRole.Employee);
+        await dbContext.SaveChangesAsync();
+        var profile = dbContext.UserProfiles.Single(p => p.UserId == 20);
+        profile.ManagerUserId = 2;
+        profile.CurrentUtilizationPercent = 80;
+        profile.ResourceStatus = EmployeeStatus.PartiallyAllocated;
+        dbContext.Projects.Add(new Project
+        {
+            Id = 1,
+            Name = "Apollo",
+            ManagerUserId = 2,
+            StartDate = today.AddMonths(-1),
+            EndDate = today.AddMonths(6),
+            Status = ProjectStatus.Active
+        });
+        dbContext.Allocations.Add(new Allocation
+        {
+            Id = 1,
+            UserId = 20,
+            ProjectId = 1,
+            CreatedByUserId = 2,
+            UtilizationPercentage = 80,
+            FromDate = today.AddDays(-30),
+            ToDate = today.AddDays(-1),
+            Status = AllocationStatus.Active
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var updatedCount = await service.SyncAllActiveProfilesAsync();
+
+        var updatedProfile = await dbContext.UserProfiles.SingleAsync(item => item.UserId == 20);
+        Assert.Equal(1, updatedCount);
+        Assert.Equal(0, updatedProfile.CurrentUtilizationPercent);
+        Assert.Equal(EmployeeStatus.Bench, updatedProfile.ResourceStatus);
+    }

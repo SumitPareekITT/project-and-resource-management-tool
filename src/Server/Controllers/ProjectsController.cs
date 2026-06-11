@@ -1,17 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using ProjectResourceManagement.Server.Security;
+using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Server.Services.Admin;
 using ProjectResourceManagement.Shared.DTOs.Admin;
-using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Controllers;
 
 [ApiController]
 [Route("api/projects")]
-[RequireRole(UserRole.Admin)]
 public sealed class ProjectsController(ProjectAdminService projectAdminService) : ControllerBase
 {
     [HttpGet]
+    [RequirePermission(PermissionCodes.ProjectsList)]
     public async Task<IActionResult> ListAsync(CancellationToken cancellationToken)
     {
         var result = await projectAdminService.ListProjectsAsync(cancellationToken);
@@ -19,6 +19,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpGet("{projectId:int}", Name = nameof(GetProjectByIdAsync))]
+    [RequirePermission(PermissionCodes.ProjectsList)]
     public async Task<IActionResult> GetProjectByIdAsync(int projectId, CancellationToken cancellationToken)
     {
         var result = await projectAdminService.GetProjectAsync(projectId, cancellationToken);
@@ -26,6 +27,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpPost]
+    [RequirePermission(PermissionCodes.ProjectsCreate)]
     public async Task<IActionResult> CreateAsync([FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
     {
         var result = await projectAdminService.CreateProjectAsync(request, cancellationToken);
@@ -33,6 +35,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpPut("{projectId:int}")]
+    [RequirePermission(PermissionCodes.ProjectsUpdate)]
     public async Task<IActionResult> UpdateAsync(
         int projectId,
         [FromBody] UpdateProjectRequest request,
@@ -43,6 +46,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpPut("{projectId:int}/status")]
+    [RequirePermission(PermissionCodes.ProjectsUpdateStatus)]
     public async Task<IActionResult> UpdateStatusAsync(
         int projectId,
         [FromBody] UpdateProjectStatusRequest request,
@@ -53,6 +57,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpPost("{projectId:int}/milestones")]
+    [RequirePermission(PermissionCodes.ProjectsMilestonesManage)]
     public async Task<IActionResult> AddMilestoneAsync(
         int projectId,
         [FromBody] UpsertMilestoneRequest request,
@@ -63,6 +68,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpPut("{projectId:int}/milestones/{milestoneId:int}")]
+    [RequirePermission(PermissionCodes.ProjectsMilestonesManage)]
     public async Task<IActionResult> UpdateMilestoneAsync(
         int projectId,
         int milestoneId,
@@ -74,6 +80,7 @@ public sealed class ProjectsController(ProjectAdminService projectAdminService) 
     }
 
     [HttpPut("{projectId:int}/milestones/{milestoneId:int}/status")]
+    [RequirePermission(PermissionCodes.ProjectsMilestonesManage)]
     public async Task<IActionResult> UpdateMilestoneStatusAsync(
         int projectId,
         int milestoneId,

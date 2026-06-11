@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using ProjectResourceManagement.Server.Data;
 using ProjectResourceManagement.Server.Data.Repositories;
-using ProjectResourceManagement.Server.Models;
+using ProjectResourceManagement.Server.Security;
 using ProjectResourceManagement.Server.Services;
 using ProjectResourceManagement.Shared.DTOs.Auth;
 using ProjectResourceManagement.Shared.Enums;
@@ -15,24 +16,17 @@ public sealed class AuthServiceTests
     {
         await using var dbContext = CreateDbContext();
         var hasher = new Pbkdf2PasswordHasher();
-        dbContext.Users.Add(new User
-        {
-            Id = 1,
-            FullName = "Admin",
-            Email = "admin@test.local",
-            Username = "admin",
-            PasswordHash = hasher.Hash("Admin@1234"),
-            Role = UserRole.Admin,
-            IsActive = true,
-            ForcePasswordChange = false
-        });
+        var user = SchemaV3TestHelpers.SeedUser(dbContext, 1, "admin", "Admin", "admin@test.local", UserRole.Admin);
+        user.PasswordHash = hasher.Hash("Admin@1234");
+        user.ForcePasswordChange = false;
         await dbContext.SaveChangesAsync();
 
         var service = CreateService(dbContext, hasher);
         var result = await service.LoginAsync(new LoginRequest("admin", "Admin@1234"));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(UserRole.Admin, result.Value!.Role);
+        Assert.Contains("Admin", result.Value!.Roles);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.AccessToken));
     }
 
     [Fact]
@@ -40,16 +34,8 @@ public sealed class AuthServiceTests
     {
         await using var dbContext = CreateDbContext();
         var hasher = new Pbkdf2PasswordHasher();
-        dbContext.Users.Add(new User
-        {
-            Id = 1,
-            FullName = "Admin",
-            Email = "admin@test.local",
-            Username = "admin",
-            PasswordHash = hasher.Hash("Admin@1234"),
-            Role = UserRole.Admin,
-            IsActive = true
-        });
+        var user = SchemaV3TestHelpers.SeedUser(dbContext, 1, "admin", "Admin", "admin@test.local", UserRole.Admin);
+        user.PasswordHash = hasher.Hash("Admin@1234");
         await dbContext.SaveChangesAsync();
 
         var service = CreateService(dbContext, hasher);
@@ -64,31 +50,35 @@ public sealed class AuthServiceTests
     {
         await using var dbContext = CreateDbContext();
         var hasher = new Pbkdf2PasswordHasher();
-        dbContext.Users.Add(new User
-        {
-            Id = 2,
-            FullName = "Manager",
-            Email = "manager@test.local",
-            Username = "manager",
-            PasswordHash = hasher.Hash("Temp@1234"),
-            Role = UserRole.Manager,
-            IsActive = true,
-            ForcePasswordChange = true
-        });
+        var user = SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "manager@test.local", UserRole.Manager);
+        user.PasswordHash = hasher.Hash("Temp@1234");
+        user.ForcePasswordChange = true;
         await dbContext.SaveChangesAsync();
 
         var service = CreateService(dbContext, hasher);
-        var result = await service.ChangePasswordAsync(new ChangePasswordRequest(2, "NewPass@123", "NewPass@123"));
+        var result = await service.ChangePasswordAsync(2, new ChangePasswordRequest("NewPass@123", "NewPass@123"));
 
         Assert.True(result.IsSuccess);
-        var user = await dbContext.Users.SingleAsync(item => item.Id == 2);
-        Assert.False(user.ForcePasswordChange);
-        Assert.True(hasher.Verify("NewPass@123", user.PasswordHash));
+        var updated = await dbContext.Users.SingleAsync(item => item.Id == 2);
+        Assert.False(updated.ForcePasswordChange);
+        Assert.True(hasher.Verify("NewPass@123", updated.PasswordHash));
     }
 
     private static AuthService CreateService(ApplicationDbContext dbContext, IPasswordHasher hasher)
     {
-        return new AuthService(new UserRepository(dbContext), hasher);
+        var jwtOptions = Options.Create(new JwtSettings
+        {
+            Issuer = "test-issuer",
+            Audience = "test-audience",
+            Secret = "prm-test-jwt-secret-for-unit-tests",
+            ExpirationMinutes = 60
+        });
+
+        return new AuthService(
+            new UserRepository(dbContext),
+            new RbacRepository(dbContext),
+            hasher,
+            new JwtTokenService(jwtOptions));
     }
 
     private static ApplicationDbContext CreateDbContext()
@@ -96,7 +86,6 @@ public sealed class AuthServiceTests
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-
         return new ApplicationDbContext(options);
     }
 }

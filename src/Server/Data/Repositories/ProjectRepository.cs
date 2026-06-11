@@ -9,7 +9,8 @@ public sealed class ProjectRepository(ApplicationDbContext dbContext)
     public Task<Project?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         return dbContext.Projects
-            .Include(project => project.Manager)
+            .Include(project => project.ManagerUser)
+            .ThenInclude(manager => manager.Profile)
             .Include(project => project.Milestones)
             .FirstOrDefaultAsync(project => project.Id == id, cancellationToken);
     }
@@ -17,16 +18,17 @@ public sealed class ProjectRepository(ApplicationDbContext dbContext)
     public Task<List<Project>> ListAsync(CancellationToken cancellationToken = default)
     {
         return dbContext.Projects
-            .Include(project => project.Manager)
+            .Include(project => project.ManagerUser)
+            .ThenInclude(manager => manager.Profile)
             .Include(project => project.Milestones)
             .OrderBy(project => project.Name)
             .ToListAsync(cancellationToken);
     }
 
-    public Task<List<Project>> ListByManagerIdAsync(int managerId, CancellationToken cancellationToken = default)
+    public Task<List<Project>> ListByManagerUserIdAsync(int managerUserId, CancellationToken cancellationToken = default)
     {
         return dbContext.Projects
-            .Where(project => project.ManagerId == managerId)
+            .Where(project => project.ManagerUserId == managerUserId)
             .OrderBy(project => project.Name)
             .ToListAsync(cancellationToken);
     }

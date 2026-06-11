@@ -1,5 +1,3 @@
-using ProjectResourceManagement.Shared.Enums;
-
 namespace ProjectResourceManagement.Shared.DTOs.Admin;
 
 public sealed record UserSummaryDto(
@@ -7,6 +5,6 @@ public sealed record UserSummaryDto(
     string FullName,
     string Email,
     string Username,
-    UserRole Role,
+    IReadOnlyList<string> Roles,
     bool ForcePasswordChange,
     bool IsActive);

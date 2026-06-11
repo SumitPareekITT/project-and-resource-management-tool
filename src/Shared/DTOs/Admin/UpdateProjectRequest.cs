@@ -9,6 +9,6 @@ public sealed record UpdateProjectRequest(
     DateOnly StartDate,
     DateOnly EndDate,
     ProjectStatus Status,
-    int ManagerId,
+    int ManagerUserId,
     int TotalStoryPoints,
     int CompletedStoryPoints);

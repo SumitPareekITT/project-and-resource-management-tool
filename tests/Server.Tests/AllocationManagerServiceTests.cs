@@ -34,7 +34,7 @@ public sealed class AllocationManagerServiceTests
         await SeedTeamDataAsync(dbContext);
 
         var service = CreateService(dbContext);
-        var result = await service.AllocateAsync(2, new CreateAllocationRequest(1, 99, 50, DateOnly.FromDateTime(DateTime.UtcNow), null)); // employee 99 reports to manager 3
+        var result = await service.AllocateAsync(2, new CreateAllocationRequest(1, 29, 50, DateOnly.FromDateTime(DateTime.UtcNow), null)); // employee 99 reports to manager 3
 
         Assert.False(result.Succeeded);
         Assert.Equal(AdminResultCode.ValidationError, result.Code);
@@ -48,9 +48,9 @@ public sealed class AllocationManagerServiceTests
         dbContext.Allocations.Add(new Allocation
         {
             Id = 50,
-            EmployeeId = 10,
+            UserId = 20,
             ProjectId = 1,
-            CreatedByManagerId = 2,
+            CreatedByUserId = 2,
             UtilizationPercentage = 80,
             FromDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)),
             Status = AllocationStatus.Active
@@ -58,7 +58,7 @@ public sealed class AllocationManagerServiceTests
         await dbContext.SaveChangesAsync();
 
         var service = CreateService(dbContext);
-        var result = await service.AllocateAsync(2, new CreateAllocationRequest(1, 10, 30, DateOnly.FromDateTime(DateTime.UtcNow), null));
+        var result = await service.AllocateAsync(2, new CreateAllocationRequest(1, 20, 30, DateOnly.FromDateTime(DateTime.UtcNow), null));
 
         Assert.False(result.Succeeded);
         Assert.Contains("100%", result.Message);
@@ -71,36 +71,36 @@ public sealed class AllocationManagerServiceTests
         await SeedTeamDataAsync(dbContext);
 
         var service = CreateService(dbContext);
-        var result = await service.AllocateAsync(2, new CreateAllocationRequest(1, 10, 50, DateOnly.FromDateTime(DateTime.UtcNow), null));
+        var result = await service.AllocateAsync(2, new CreateAllocationRequest(1, 20, 50, DateOnly.FromDateTime(DateTime.UtcNow), null));
 
         Assert.True(result.Succeeded);
-        var employee = await dbContext.Employees.SingleAsync(item => item.Id == 10);
+        var employee = await dbContext.UserProfiles.SingleAsync(item => item.UserId == 20);
         Assert.Equal(50, employee.CurrentUtilizationPercent);
-        Assert.Equal(EmployeeStatus.PartiallyAllocated, employee.Status);
+        Assert.Equal(EmployeeStatus.PartiallyAllocated, employee.ResourceStatus);
     }
 
-    private static async Task SeedTeamDataAsync(ApplicationDbContext dbContext)
+        private static async Task SeedTeamDataAsync(ApplicationDbContext dbContext)
     {
-        dbContext.Users.AddRange(
-            new User { Id = 2, FullName = "Manager", Email = "m@test", Username = "manager", PasswordHash = "h", Role = UserRole.Manager, IsActive = true },
-            new User { Id = 3, FullName = "Other Manager", Email = "om@test", Username = "omanager", PasswordHash = "h", Role = UserRole.Manager, IsActive = true },
-            new User { Id = 20, FullName = "Team Member One", Email = "one@test", Username = "one", PasswordHash = "h", Role = UserRole.Employee, IsActive = true },
-            new User { Id = 21, FullName = "Team Member Two", Email = "two@test", Username = "two", PasswordHash = "h", Role = UserRole.Employee, IsActive = true },
-            new User { Id = 29, FullName = "Other Team Member", Email = "other@test", Username = "other", PasswordHash = "h", Role = UserRole.Employee, IsActive = true });
+        SchemaV3TestHelpers.SeedUser(dbContext, 2, "manager", "Manager", "m@test", UserRole.Manager);
+        SchemaV3TestHelpers.SeedUser(dbContext, 3, "omanager", "Other Manager", "om@test", UserRole.Manager);
+        SchemaV3TestHelpers.SeedUser(dbContext, 20, "one", "Team Member One", "one@test", UserRole.Employee);
+        SchemaV3TestHelpers.SeedUser(dbContext, 21, "two", "Team Member Two", "two@test", UserRole.Employee);
+        SchemaV3TestHelpers.SeedUser(dbContext, 29, "other", "Other Team Member", "other@test", UserRole.Employee);
+
+        await dbContext.SaveChangesAsync();
+
+        dbContext.UserProfiles.Single(p => p.UserId == 20).ManagerUserId = 2;
+        dbContext.UserProfiles.Single(p => p.UserId == 21).ManagerUserId = 2;
+        dbContext.UserProfiles.Single(p => p.UserId == 29).ManagerUserId = 3;
 
         dbContext.Projects.Add(new Project
         {
             Id = 1,
             Name = "Apollo",
-            ManagerId = 2,
+            ManagerUserId = 2,
             StartDate = DateOnly.FromDateTime(DateTime.UtcNow),
             EndDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3))
         });
-
-        dbContext.Employees.AddRange(
-            new Employee { Id = 10, UserId = 20, ManagerId = 2, FullName = "Team Member One", Email = "one@test", Department = "Eng", Designation = "SE" },
-            new Employee { Id = 11, UserId = 21, ManagerId = 2, FullName = "Team Member Two", Email = "two@test", Department = "Eng", Designation = "SE" },
-            new Employee { Id = 99, UserId = 29, ManagerId = 3, FullName = "Other Team Member", Email = "other@test", Department = "Eng", Designation = "SE" });
 
         await dbContext.SaveChangesAsync();
     }
@@ -108,11 +108,11 @@ public sealed class AllocationManagerServiceTests
     private static AllocationManagerService CreateService(ApplicationDbContext dbContext)
     {
         return new AllocationManagerService(
-            new EmployeeRepository(dbContext),
+            new UserProfileRepository(dbContext),
             new ProjectRepository(dbContext),
             new AllocationRepository(dbContext),
             new UtilizationComputationService(
-                new EmployeeRepository(dbContext),
+                new UserProfileRepository(dbContext),
                 new AllocationRepository(dbContext)));
     }
 

@@ -10,4 +10,9 @@ public sealed class SystemConfigurationRepository(ApplicationDbContext dbContext
         return dbContext.SystemConfigurations
             .FirstOrDefaultAsync(configuration => configuration.Key == key, cancellationToken);
     }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.SaveChangesAsync(cancellationToken);
+    }
 }

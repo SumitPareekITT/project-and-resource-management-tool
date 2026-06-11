@@ -6,36 +6,36 @@ using ProjectResourceManagement.Shared.Enums;
 namespace ProjectResourceManagement.Server.Services.Scheduling;
 
 public sealed class UtilizationComputationService(
-    EmployeeRepository employeeRepository,
+    UserProfileRepository userProfileRepository,
     AllocationRepository allocationRepository)
 {
-    public async Task<int> SyncAllActiveEmployeesAsync(CancellationToken cancellationToken = default)
+    public async Task<int> SyncAllActiveProfilesAsync(CancellationToken cancellationToken = default)
     {
-        var employees = await employeeRepository.ListActiveAsync(cancellationToken);
-        foreach (var employee in employees)
+        var profiles = await userProfileRepository.ListActiveAsync(cancellationToken);
+        foreach (var profile in profiles)
         {
-            ApplyUtilization(employee, await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken));
+            ApplyUtilization(profile, await allocationRepository.ListActiveByUserIdAsync(profile.UserId, cancellationToken));
         }
 
-        await employeeRepository.SaveChangesAsync(cancellationToken);
-        return employees.Count;
+        await userProfileRepository.SaveChangesAsync(cancellationToken);
+        return profiles.Count;
     }
 
-    public async Task SyncEmployeeAsync(Employee employee, CancellationToken cancellationToken = default)
+    public async Task SyncUserProfileAsync(UserProfile profile, CancellationToken cancellationToken = default)
     {
-        var activeAllocations = await allocationRepository.ListActiveByEmployeeAsync(employee.Id, cancellationToken);
-        ApplyUtilization(employee, activeAllocations);
+        var activeAllocations = await allocationRepository.ListActiveByUserIdAsync(profile.UserId, cancellationToken);
+        ApplyUtilization(profile, activeAllocations);
     }
 
-    internal static void ApplyUtilization(Employee employee, IReadOnlyList<Allocation> activeAllocations)
+    internal static void ApplyUtilization(UserProfile profile, IReadOnlyList<Allocation> activeAllocations)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var currentUtilization = activeAllocations
             .Where(allocation => IsActiveOnDate(allocation, today))
             .Sum(allocation => allocation.UtilizationPercentage);
 
-        employee.CurrentUtilizationPercent = currentUtilization;
-        employee.Status = currentUtilization switch
+        profile.CurrentUtilizationPercent = currentUtilization;
+        profile.ResourceStatus = currentUtilization switch
         {
             0 => EmployeeStatus.Bench,
             BusinessRules.FullAllocationPercent => EmployeeStatus.Allocated,

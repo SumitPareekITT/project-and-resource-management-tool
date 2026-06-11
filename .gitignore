@@ -10,3 +10,12 @@ TestResults/
 *.md
 *.json
 *.sql
+*.png
+*.pdf
+*.dll
+*.py
+*.exe
+*.puml
+*.pdb
+*.bak
+*.Tests
