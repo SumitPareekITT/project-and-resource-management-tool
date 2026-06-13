@@ -19,10 +19,27 @@ public sealed class SkillMatchCandidateFilterTests
 
         var result = filter.FilterDirectTeam(team, "backend api");
 
-        Assert.Equal(2, result.Count);
+        Assert.Single(result);
         Assert.Equal(101, result[0].Profile.UserId);
         Assert.Contains("Backend API Development", result[0].MatchedSkills[0]);
         Assert.DoesNotContain(result, candidate => candidate.Profile.UserId == 102);
+    }
+
+    [Fact]
+    public void FilterDirectTeam_ExcludesBenchOnlyMatches_WhenQueryHasSkillKeywords()
+    {
+        var filter = new SkillMatchCandidateFilter();
+        var team = new List<UserProfile>
+        {
+            CreateProfile(1, 101, "Bench Person", 0, EmployeeStatus.Bench, [], designation: "Business Analyst"),
+            CreateProfile(2, 102, "Java Dev", 20, EmployeeStatus.PartiallyAllocated,
+                [("Java", SkillCategory.Backend, ProficiencyLevel.Intermediate)])
+        };
+
+        var result = filter.FilterDirectTeam(team, "java backend developer intermediate");
+
+        Assert.Single(result);
+        Assert.Equal(102, result[0].Profile.UserId);
     }
 
     [Fact]
@@ -38,7 +55,8 @@ public sealed class SkillMatchCandidateFilterTests
         string name,
         decimal utilization,
         EmployeeStatus resourceStatus,
-        IReadOnlyList<(string SkillName, SkillCategory Category, ProficiencyLevel Proficiency)> skills)
+        IReadOnlyList<(string SkillName, SkillCategory Category, ProficiencyLevel Proficiency)> skills,
+        string designation = "Developer")
     {
         var user = new User
         {
@@ -62,7 +80,7 @@ public sealed class SkillMatchCandidateFilterTests
             FullName = name,
             Email = $"{userId}@test",
             Department = "Engineering",
-            Designation = "Developer",
+            Designation = designation,
             IsActive = true,
             CurrentUtilizationPercent = utilization,
             ResourceStatus = resourceStatus,

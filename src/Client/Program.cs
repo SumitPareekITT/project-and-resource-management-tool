@@ -84,8 +84,7 @@ static async Task<LoginResponse?> LoginAsync(HttpClient client)
     ConsoleScreen.ShowHeader("Login");
     Console.Write("Username: ");
     var username = Console.ReadLine() ?? string.Empty;
-    Console.Write("Password: ");
-    var password = Console.ReadLine() ?? string.Empty;
+    var password = ConsolePrompt.ReadPassword("Password");
 
     var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(username, password));
     if (!await ApiHelper.EnsureSuccessAsync(response))
@@ -114,10 +113,8 @@ static async Task<LoginResponse?> LoginAsync(HttpClient client)
 static async Task<bool> ChangePasswordAsync(HttpClient client)
 {
     ConsoleScreen.ShowHeader("Change Password", "Required before continuing");
-    Console.Write("New password: ");
-    var newPassword = Console.ReadLine() ?? string.Empty;
-    Console.Write("Confirm password: ");
-    var confirmPassword = Console.ReadLine() ?? string.Empty;
+    var newPassword = ConsolePrompt.ReadRequiredPassword("New password");
+    var confirmPassword = ConsolePrompt.ReadRequiredPassword("Confirm password");
 
     var response = await client.PostAsJsonAsync(
         "/api/auth/change-password",

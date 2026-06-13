@@ -41,6 +41,21 @@ public sealed class ManagerAiController(AiAssistantService aiAssistantService) :
         return ToActionResult(result);
     }
 
+    [HttpPost("team-match")]
+    [RequirePermission(PermissionCodes.ManagerAiTeamMatch)]
+    public async Task<IActionResult> MatchOrganizationTeamAsync(
+        [FromBody] AiTeamMatchRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await aiAssistantService.MatchOrganizationTeamAsync(managerUserId, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
     private bool TryGetManagerUserId(out int managerUserId, out IActionResult? errorResult)
     {
         managerUserId = 0;

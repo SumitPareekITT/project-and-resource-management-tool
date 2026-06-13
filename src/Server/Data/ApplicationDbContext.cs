@@ -212,6 +212,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         modelBuilder.Entity<RolePermission>().HasData(RbacSeedData.RolePermissions);
         modelBuilder.Entity<UserRoleAssignment>().HasData(RbacSeedData.UserRoleAssignments);
         modelBuilder.Entity<ActivityTag>().HasData(SeedData.ActivityTags);
+        modelBuilder.Entity<Skill>().HasData(SeedData.Skills);
         modelBuilder.Entity<SystemConfiguration>().HasData(SeedData.SystemConfigurations);
     }
 }

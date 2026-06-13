@@ -56,7 +56,7 @@ public sealed class Day4ApiIntegrationTests : IClassFixture<Day4ApiFactory>
 
         using var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/skills")
         {
-            Content = JsonContent.Create(new UpsertSkillRequest("Kubernetes", SkillCategory.DevOps))
+            Content = JsonContent.Create(new UpsertSkillRequest("Rust Programming", SkillCategory.Backend))
         };
         AuthTestHelper.SetBearerToken(createRequest, token);
 
@@ -70,7 +70,7 @@ public sealed class Day4ApiIntegrationTests : IClassFixture<Day4ApiFactory>
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
 
         var body = await listResponse.Content.ReadAsStringAsync();
-        Assert.Contains("Kubernetes", body);
+        Assert.Contains("Rust Programming", body);
     }
 }
 

@@ -31,7 +31,7 @@ internal static class AdminUsersScreen
         var fullName = ConsolePrompt.ReadRequiredText("Full name");
         var email = ConsolePrompt.ReadRequiredText("Email");
         var username = ConsolePrompt.ReadRequiredText("Username");
-        var password = ConsolePrompt.ReadRequiredText("Temporary password");
+        var password = ConsolePrompt.ReadRequiredPassword("Temporary password");
         var role = ReadUserRole();
         if (role is null)
         {
@@ -96,7 +96,7 @@ internal static class AdminUsersScreen
         ConsoleScreen.ShowHeader("Reset Password");
 
         var userId = ConsolePrompt.ReadRequiredInt("User ID");
-        var password = ConsolePrompt.ReadRequiredText("New password");
+        var password = ConsolePrompt.ReadRequiredPassword("New password");
 
         var response = await client.PutAsJsonAsync(
             $"/api/users/{userId}/reset-password",

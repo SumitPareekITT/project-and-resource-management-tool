@@ -13,8 +13,11 @@ public sealed class SkillRepository(ApplicationDbContext dbContext)
 
     public Task<Skill?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
     {
+        var normalized = name.Trim();
         return dbContext.Skills
-            .FirstOrDefaultAsync(skill => skill.Name == name, cancellationToken);
+            .FirstOrDefaultAsync(
+                skill => skill.Name.ToLower() == normalized.ToLower(),
+                cancellationToken);
     }
 
     public Task<List<Skill>> ListAsync(CancellationToken cancellationToken = default)

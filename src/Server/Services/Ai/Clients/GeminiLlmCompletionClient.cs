@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using ProjectResourceManagement.Server.Services.Ai.Configuration;
 using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Services.Ai.Clients;
@@ -12,12 +13,12 @@ public sealed class GeminiLlmCompletionClient(IHttpClientFactory httpClientFacto
 
     public async Task<LlmCompletionResult> CompleteAsync(
         LlmCompletionRequest request,
-        string apiKey,
+        LlmSettings settings,
         CancellationToken cancellationToken = default)
     {
         var httpClient = httpClientFactory.CreateClient(nameof(GeminiLlmCompletionClient));
         var endpoint =
-            $"https://generativelanguage.googleapis.com/v1beta/models/{ModelName}:generateContent?key={Uri.EscapeDataString(apiKey)}";
+            $"https://generativelanguage.googleapis.com/v1beta/models/{ModelName}:generateContent?key={Uri.EscapeDataString(settings.ApiKey)}";
 
         var payload = new
         {

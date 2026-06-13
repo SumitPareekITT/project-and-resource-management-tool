@@ -6,6 +6,12 @@ namespace ProjectResourceManagement.Server.Services.Ai.Filtering;
 
 public sealed class SkillMatchCandidateFilter
 {
+    private static readonly HashSet<string> GenericQueryTokens = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "developer", "engineer", "tester", "manager", "employee", "experience",
+        "intermediate", "advanced", "beginner", "expert", "need", "week", "hours"
+    };
+
     public IReadOnlyList<SkillMatchCandidate> FilterDirectTeam(
         IReadOnlyList<UserProfile> directTeamMembers,
         string naturalLanguageQuery)
@@ -16,7 +22,7 @@ public sealed class SkillMatchCandidateFilter
             .Where(profile => profile.IsActive)
             .Where(profile => profile.CurrentUtilizationPercent < BusinessRules.FullAllocationPercent)
             .Select(profile => ScoreProfile(profile, queryTokens))
-            .Where(candidate => candidate.MatchScore > 0 || queryTokens.Count == 0)
+            .Where(candidate => candidate.HasQueryMatch)
             .OrderByDescending(candidate => candidate.MatchScore)
             .ThenBy(candidate => candidate.CurrentUtilizationPercent)
             .ThenBy(candidate => candidate.Profile.FullName)
@@ -28,6 +34,7 @@ public sealed class SkillMatchCandidateFilter
     {
         var matchedSkills = new List<string>();
         var score = 0;
+        var hasRoleContextMatch = false;
 
         foreach (var userSkill in profile.User.Skills)
         {
@@ -50,14 +57,16 @@ public sealed class SkillMatchCandidateFilter
 
         if (queryTokens.Count > 0)
         {
-            if (queryTokens.Any(token => profile.Department.Contains(token, StringComparison.OrdinalIgnoreCase)))
+            if (queryTokens.Any(token => IsSpecificToken(token) && profile.Department.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {
                 score += 1;
+                hasRoleContextMatch = true;
             }
 
-            if (queryTokens.Any(token => profile.Designation.Contains(token, StringComparison.OrdinalIgnoreCase)))
+            if (queryTokens.Any(token => IsSpecificToken(token) && profile.Designation.Contains(token, StringComparison.OrdinalIgnoreCase)))
             {
                 score += 1;
+                hasRoleContextMatch = true;
             }
         }
 
@@ -68,10 +77,15 @@ public sealed class SkillMatchCandidateFilter
             _ => 0
         };
 
+        var hasQueryMatch = queryTokens.Count == 0
+            || matchedSkills.Count > 0
+            || hasRoleContextMatch;
+
         return new SkillMatchCandidate
         {
             Profile = profile,
             MatchScore = score,
+            HasQueryMatch = hasQueryMatch,
             MatchedSkills = matchedSkills,
             DeterministicExplanation = BuildDeterministicExplanation(profile, matchedSkills, score)
         };
@@ -107,4 +121,6 @@ public sealed class SkillMatchCandidateFilter
         return $"{profile.FullName} scored {score} based on skills ({skillsText}), " +
                $"status {profile.ResourceStatus}, and utilization {profile.CurrentUtilizationPercent:0.##}%.";
     }
+
+    private static bool IsSpecificToken(string token) => !GenericQueryTokens.Contains(token);
 }

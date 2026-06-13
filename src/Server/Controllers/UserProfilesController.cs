@@ -58,6 +58,17 @@ public sealed class UserProfilesController(UserProfileAdminService userProfileAd
         return ToActionResult(result);
     }
 
+    [HttpPost("by-user/{userId:int}/skills")]
+    [RequirePermission(PermissionCodes.UserProfilesSkillsUpsert)]
+    public async Task<IActionResult> AddSkillByNameAsync(
+        int userId,
+        [FromBody] AddUserSkillByNameRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await userProfileAdminService.AddOrUpdateUserSkillByNameAsync(userId, request, cancellationToken);
+        return ToActionResult(result);
+    }
+
     [HttpDelete("{profileId:int}/skills/{skillId:int}")]
     [RequirePermission(PermissionCodes.UserProfilesSkillsRemove)]
     public async Task<IActionResult> RemoveSkillAsync(int profileId, int skillId, CancellationToken cancellationToken)

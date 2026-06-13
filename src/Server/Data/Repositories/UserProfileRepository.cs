@@ -65,6 +65,17 @@ public sealed class UserProfileRepository(ApplicationDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<UserProfile>> ListActiveWithSkillsAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.UserProfiles
+            .Include(profile => profile.User)
+            .ThenInclude(user => user.Skills)
+            .ThenInclude(skill => skill.Skill)
+            .Where(profile => profile.IsActive)
+            .OrderBy(profile => profile.FullName)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<List<UserProfile>> ListByManagerUserIdAsync(int managerUserId, CancellationToken cancellationToken = default)
     {
         return dbContext.UserProfiles

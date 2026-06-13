@@ -14,12 +14,16 @@ namespace ProjectResourceManagement.Server.Services.Ai;
 public sealed class AiAssistantService(
     UserProfileRepository userProfileRepository,
     ProjectRepository projectRepository,
+    AllocationRepository allocationRepository,
     SkillMatchCandidateFilter skillMatchCandidateFilter,
+    OrganizationTeamMatcher organizationTeamMatcher,
     ProjectRiskFactAssembler projectRiskFactAssembler,
     SkillMatchPromptBuilder skillMatchPromptBuilder,
     ProjectRiskPromptBuilder projectRiskPromptBuilder,
+    TeamMatchPromptBuilder teamMatchPromptBuilder,
     DeterministicSkillMatchSummarizer deterministicSkillMatchSummarizer,
     DeterministicProjectRiskSummarizer deterministicProjectRiskSummarizer,
+    DeterministicTeamMatchSummarizer deterministicTeamMatchSummarizer,
     LlmConfigurationReader llmConfigurationReader,
     LlmCompletionClientFactory llmCompletionClientFactory)
 {
@@ -52,7 +56,11 @@ public sealed class AiAssistantService(
         }
 
         var directTeam = await userProfileRepository.ListByManagerUserIdAsync(managerUserId, cancellationToken);
-        var filteredCandidates = skillMatchCandidateFilter.FilterDirectTeam(directTeam, request.Query.Trim());
+        var employeeTeam = directTeam
+            .Where(profile => profile.User.RoleAssignments.Any(assignment =>
+                assignment.Role.RoleName.Equals(nameof(UserRole.Employee), StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        var filteredCandidates = skillMatchCandidateFilter.FilterDirectTeam(employeeTeam, request.Query.Trim());
         var llmSettings = await llmConfigurationReader.ReadAsync(cancellationToken);
         var summary = await BuildSkillMatchSummaryAsync(request.Query.Trim(), filteredCandidates, llmSettings, cancellationToken);
 
@@ -64,6 +72,74 @@ public sealed class AiAssistantService(
             summary.ProviderUsed);
 
         return AdminResult<AiSkillMatchResponse>.Success(response);
+    }
+
+    public async Task<AdminResult<AiTeamMatchResponse>> MatchOrganizationTeamAsync(
+        int managerUserId,
+        AiTeamMatchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Roles is null || request.Roles.Count == 0)
+        {
+            return AdminResult<AiTeamMatchResponse>.Fail(
+                AdminResultCode.ValidationError,
+                "At least one team role requirement is required.");
+        }
+
+        foreach (var role in request.Roles)
+        {
+            if (string.IsNullOrWhiteSpace(role.RoleTitle) || string.IsNullOrWhiteSpace(role.RequiredSkillName))
+            {
+                return AdminResult<AiTeamMatchResponse>.Fail(
+                    AdminResultCode.ValidationError,
+                    "Each role must include a role title and required skill name.");
+            }
+        }
+
+        string? projectName = null;
+        if (request.ProjectId is int projectId)
+        {
+            var ownedProject = await projectRepository.GetByIdAsync(projectId, cancellationToken);
+            if (ownedProject is null)
+            {
+                return AdminResult<AiTeamMatchResponse>.Fail(AdminResultCode.NotFound, "Project was not found.");
+            }
+
+            if (ownedProject.ManagerUserId != managerUserId)
+            {
+                return AdminResult<AiTeamMatchResponse>.Fail(
+                    AdminResultCode.ValidationError,
+                    "You can run team matching only for projects you own.");
+            }
+
+            projectName = ownedProject.Name;
+        }
+
+        var organizationProfiles = await userProfileRepository.ListActiveWithSkillsAsync(cancellationToken);
+        var activeAllocations = await allocationRepository.ListAllActiveAsync(cancellationToken);
+        var allocationsByUser = activeAllocations
+            .GroupBy(allocation => allocation.UserId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var matchResults = organizationTeamMatcher.MatchOrganizationTeam(
+            request.Roles,
+            organizationProfiles,
+            allocationsByUser);
+
+        var llmSettings = await llmConfigurationReader.ReadAsync(cancellationToken);
+        var summary = await BuildTeamMatchSummaryAsync(request.Context, projectName, matchResults, llmSettings, cancellationToken);
+
+        var roleDtos = matchResults.Select(MapTeamRoleResult).ToList();
+        var response = new AiTeamMatchResponse(
+            roleDtos,
+            roleDtos.Count(dto => dto.IsFilled),
+            roleDtos.Count,
+            summary.Text,
+            summary.UsedFallback,
+            summary.ProviderUsed,
+            projectName);
+
+        return AdminResult<AiTeamMatchResponse>.Success(response);
     }
 
     public async Task<AdminResult<AiProjectRiskSummaryResponse>> SummarizeProjectRiskAsync(
@@ -123,11 +199,19 @@ public sealed class AiAssistantService(
         }
 
         var prompt = skillMatchPromptBuilder.Build(query, candidates);
-        var completion = await llmClient.CompleteAsync(prompt, llmSettings.ApiKey, cancellationToken);
+        var completion = await llmClient.CompleteAsync(prompt, llmSettings, cancellationToken);
         if (!completion.Succeeded)
         {
             return new SummaryResult(
                 $"{deterministicSkillMatchSummarizer.Summarize(query, candidates)} LLM error: {completion.ErrorMessage}",
+                UsedFallback: true,
+                ProviderUsed: llmSettings.Provider);
+        }
+
+        if (!SkillMatchSummaryValidator.IsFaithfulToCandidates(completion.Content, candidates))
+        {
+            return new SummaryResult(
+                deterministicSkillMatchSummarizer.Summarize(query, candidates),
                 UsedFallback: true,
                 ProviderUsed: llmSettings.Provider);
         }
@@ -144,13 +228,13 @@ public sealed class AiAssistantService(
         if (llmClient is null)
         {
             return new SummaryResult(
-                deterministicProjectRiskSummarizer.Summarize(facts),
+                $"{deterministicProjectRiskSummarizer.Summarize(facts)} LLM provider is not configured, so this summary uses system facts only.",
                 UsedFallback: true,
                 ProviderUsed: LlmProvider.None);
         }
 
         var prompt = projectRiskPromptBuilder.Build(facts);
-        var completion = await llmClient.CompleteAsync(prompt, llmSettings.ApiKey, cancellationToken);
+        var completion = await llmClient.CompleteAsync(prompt, llmSettings, cancellationToken);
         if (!completion.Succeeded)
         {
             return new SummaryResult(
@@ -160,6 +244,71 @@ public sealed class AiAssistantService(
         }
 
         return new SummaryResult(completion.Content, UsedFallback: false, ProviderUsed: llmSettings.Provider);
+    }
+
+    private async Task<SummaryResult> BuildTeamMatchSummaryAsync(
+        string? context,
+        string? projectName,
+        IReadOnlyList<TeamRoleMatchResult> roleResults,
+        LlmSettings llmSettings,
+        CancellationToken cancellationToken)
+    {
+        var combinedContext = string.IsNullOrWhiteSpace(projectName)
+            ? context
+            : $"Project: {projectName}. {context}".Trim();
+
+        var llmClient = llmCompletionClientFactory.Resolve(llmSettings);
+        if (llmClient is null)
+        {
+            return new SummaryResult(
+                deterministicTeamMatchSummarizer.Summarize(roleResults),
+                UsedFallback: true,
+                ProviderUsed: LlmProvider.None);
+        }
+
+        var prompt = teamMatchPromptBuilder.Build(combinedContext, roleResults);
+        var completion = await llmClient.CompleteAsync(prompt, llmSettings, cancellationToken);
+        if (!completion.Succeeded)
+        {
+            return new SummaryResult(
+                $"{deterministicTeamMatchSummarizer.Summarize(roleResults)} LLM error: {completion.ErrorMessage}",
+                UsedFallback: true,
+                ProviderUsed: llmSettings.Provider);
+        }
+
+        return new SummaryResult(completion.Content, UsedFallback: false, ProviderUsed: llmSettings.Provider);
+    }
+
+    private static TeamRoleMatchResultDto MapTeamRoleResult(TeamRoleMatchResult result)
+    {
+        SkillMatchCandidateDto? candidateDto = null;
+        if (result.MatchedProfile is not null)
+        {
+            candidateDto = new SkillMatchCandidateDto(
+                result.MatchedProfile.UserId,
+                result.MatchedProfile.FullName,
+                result.MatchedProfile.Department,
+                result.MatchedProfile.Designation,
+                result.MatchedProfile.ResourceStatus,
+                result.MatchedProfile.CurrentUtilizationPercent,
+                result.MatchScore,
+                string.IsNullOrWhiteSpace(result.MatchedSkillLabel)
+                    ? []
+                    : [result.MatchedSkillLabel],
+                string.IsNullOrWhiteSpace(result.Explanation)
+                    ? result.GapReason
+                    : result.Explanation);
+        }
+
+        return new TeamRoleMatchResultDto(
+            result.Role.RoleTitle,
+            result.Role.RequiredSkillName,
+            result.Role.MinimumProficiency,
+            result.IsFilled,
+            result.GapType,
+            result.GapReason,
+            result.AvailableFromDate,
+            candidateDto);
     }
 
     private static SkillMatchCandidateDto MapSkillMatchCandidate(SkillMatchCandidate candidate)

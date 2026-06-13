@@ -1,3 +1,4 @@
+using ProjectResourceManagement.Server.Services.Ai.Configuration;
 using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Services.Ai.Clients;
@@ -8,6 +9,6 @@ public interface ILlmCompletionClient
 
     Task<LlmCompletionResult> CompleteAsync(
         LlmCompletionRequest request,
-        string apiKey,
+        LlmSettings settings,
         CancellationToken cancellationToken = default);
 }
