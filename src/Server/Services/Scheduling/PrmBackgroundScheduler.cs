@@ -1,4 +1,5 @@
 using ProjectResourceManagement.Shared.Constants;
+using ProjectResourceManagement.Server.Services.Timesheets;
 
 namespace ProjectResourceManagement.Server.Services.Scheduling;
 
@@ -33,14 +34,17 @@ public sealed class PrmBackgroundScheduler(
             using var scope = scopeFactory.CreateScope();
             var utilizationService = scope.ServiceProvider.GetRequiredService<UtilizationComputationService>();
             var projectHealthService = scope.ServiceProvider.GetRequiredService<ProjectHealthService>();
+            var timesheetComplianceService = scope.ServiceProvider.GetRequiredService<TimesheetComplianceService>();
 
             var employeeCount = await utilizationService.SyncAllActiveProfilesAsync(cancellationToken);
             var projectCount = await projectHealthService.EvaluateAndPersistAllProjectsAsync(cancellationToken);
+            var complianceCount = await timesheetComplianceService.ProcessDailyComplianceAsync(cancellationToken);
 
             logger.LogInformation(
-                "Scheduler completed utilization sync for {EmployeeCount} employees and health evaluation for {ProjectCount} projects.",
+                "Scheduler completed utilization sync for {EmployeeCount} employees, health evaluation for {ProjectCount} projects, and timesheet compliance for {ComplianceCount} employees.",
                 employeeCount,
-                projectCount);
+                projectCount,
+                complianceCount);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

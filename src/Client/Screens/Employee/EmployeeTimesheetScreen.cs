@@ -14,6 +14,18 @@ internal static class EmployeeTimesheetScreen
     {
         ConsoleScreen.ShowHeader("Submit Timesheet", $"Employee: {session.FullName}");
 
+        var reminderResponse = await client.GetAsync("/api/employee/timesheets/missing-reminder");
+        if (await ApiHelper.EnsureSuccessAsync(reminderResponse))
+        {
+            var reminder = await ApiHelper.ReadAsync<EmployeeTimesheetReminderDto>(reminderResponse);
+            if (reminder is { IsTimesheetSubmissionFrozen: true })
+            {
+                ConsoleScreen.ShowError(reminder.Message ?? "Timesheet submission is frozen. Contact your manager.");
+                ConsoleScreen.Pause();
+                return;
+            }
+        }
+
         var defaultWeek = WeekHelper.GetDefaultTimesheetWeekStart();
         var weekStart = ConsolePrompt.ReadDate("Week start date (yyyy-MM-dd)", defaultWeek);
 

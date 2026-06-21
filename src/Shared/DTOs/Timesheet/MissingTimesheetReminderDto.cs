@@ -4,4 +4,6 @@ public sealed record MissingTimesheetReminderDto(
     int UserId,
     string UserName,
     string Email,
-    DateOnly WeekStartDate);
+    DateOnly WeekStartDate,
+    int ReminderCount,
+    bool IsTimesheetSubmissionFrozen);

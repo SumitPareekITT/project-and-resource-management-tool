@@ -42,6 +42,9 @@ public static class PermissionCodes
     public const string ManagerAiProjectRisk = "manager.ai.project_risk";
     public const string ManagerAiTeamMatch = "manager.ai.team_match";
 
+    public const string ManagerTimesheetsRestore = "manager.timesheets.restore";
+    public const string ManagerTimesheetsFrozenList = "manager.timesheets.frozen_list";
+
     public const string EmployeeTimesheetsSubmit = "employee.timesheets.submit";
     public const string EmployeeTimesheetsHistory = "employee.timesheets.history";
     public const string EmployeeTimesheetsView = "employee.timesheets.view";

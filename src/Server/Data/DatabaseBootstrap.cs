@@ -30,6 +30,7 @@ internal static class DatabaseBootstrap
         if (!autoRecreate)
         {
             await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+            await SchemaPatchRunner.ApplyAsync(dbContext, logger, cancellationToken);
             return;
         }
 
@@ -66,6 +67,7 @@ internal static class DatabaseBootstrap
 
         logger.LogInformation("Database schema is current.");
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await SchemaPatchRunner.ApplyAsync(dbContext, logger, cancellationToken);
     }
 
     private static async Task<HashSet<string>> ListTableNamesAsync(

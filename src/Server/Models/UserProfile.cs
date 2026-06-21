@@ -14,6 +14,11 @@ public sealed class UserProfile
     public EmployeeStatus ResourceStatus { get; set; } = EmployeeStatus.Bench;
     public decimal CurrentUtilizationPercent { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool IsTimesheetSubmissionFrozen { get; set; }
+    public DateOnly? TimesheetComplianceMissingWeek { get; set; }
+    public int TimesheetReminderCount { get; set; }
+    public DateOnly? LastTimesheetReminderSentOn { get; set; }
+    public DateTime? TimesheetFrozenAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? DeactivatedAtUtc { get; set; }
 

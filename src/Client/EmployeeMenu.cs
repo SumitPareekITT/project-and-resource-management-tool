@@ -108,20 +108,21 @@ internal static class EmployeeMenu
 
         var reminder = await ApiHelper.ReadAsync<EmployeeTimesheetReminderDto>(response);
 
-        if (reminder is { HasMissingTimesheet: true, MissingWeekStartDate: not null })
-
+        if (reminder is { IsTimesheetSubmissionFrozen: true })
         {
-
-            ConsoleScreen.ShowWarning(
-
-                $"Reminder: Timesheet for week {reminder.MissingWeekStartDate:yyyy-MM-dd} has not been submitted.");
-
+            ConsoleScreen.ShowError(reminder.Message ?? "Timesheet submission is frozen. Contact your manager.");
             Console.WriteLine(new string('─', 46));
-
             Console.WriteLine();
-
+            return;
         }
 
+        if (reminder is { HasMissingTimesheet: true, MissingWeekStartDate: not null })
+        {
+            ConsoleScreen.ShowWarning(
+                reminder.Message ?? $"Reminder: Timesheet for week {reminder.MissingWeekStartDate:yyyy-MM-dd} has not been submitted.");
+            Console.WriteLine(new string('─', 46));
+            Console.WriteLine();
+        }
     }
 
 

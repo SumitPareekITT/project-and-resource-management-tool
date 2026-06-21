@@ -61,13 +61,15 @@ public static class RbacSeedData
         new() { Id = 72, PermissionCode = PermissionCodes.EmployeeTimesheetsView, Description = "View timesheet", HttpMethod = "GET", RoutePattern = "/api/employee/timesheets/*" },
         new() { Id = 73, PermissionCode = PermissionCodes.EmployeeAllocationsView, Description = "View allocations", HttpMethod = "GET", RoutePattern = "/api/employee/allocations" },
         new() { Id = 74, PermissionCode = PermissionCodes.EmployeeActivityTagsList, Description = "List activity tags", HttpMethod = "GET", RoutePattern = "/api/employee/activity-tags" },
-        new() { Id = 75, PermissionCode = PermissionCodes.EmployeeMissingReminder, Description = "Missing timesheet reminder", HttpMethod = "GET", RoutePattern = "/api/employee/timesheets/missing-reminder" }
+        new() { Id = 75, PermissionCode = PermissionCodes.EmployeeMissingReminder, Description = "Missing timesheet reminder", HttpMethod = "GET", RoutePattern = "/api/employee/timesheets/missing-reminder" },
+        new() { Id = 76, PermissionCode = PermissionCodes.ManagerTimesheetsFrozenList, Description = "List frozen timesheet employees", HttpMethod = "GET", RoutePattern = "/api/manager/timesheets/frozen" },
+        new() { Id = 77, PermissionCode = PermissionCodes.ManagerTimesheetsRestore, Description = "Restore employee timesheet access", HttpMethod = "PUT", RoutePattern = "/api/manager/timesheets/compliance/*/restore" }
     ];
 
     public static IReadOnlyList<RolePermission> RolePermissions { get; } =
     [
         .. Permissions.Where(p => p.Id < 60).Select(p => new RolePermission { RoleId = 1, PermissionId = p.Id }),
-        .. Permissions.Where(p => p.Id is >= 60 and <= 68).Select(p => new RolePermission { RoleId = 2, PermissionId = p.Id }),
+        .. Permissions.Where(p => p.Id is >= 60 and <= 68 or 76 or 77).Select(p => new RolePermission { RoleId = 2, PermissionId = p.Id }),
         .. Permissions.Where(p => p.Id is >= 70 and <= 75).Select(p => new RolePermission { RoleId = 3, PermissionId = p.Id })
     ];
 

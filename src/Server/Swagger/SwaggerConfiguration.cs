@@ -46,7 +46,8 @@ internal static class SwaggerConfiguration
             options.OperationFilter<AnonymousOperationFilter>();
             options.TagActionsBy(api =>
             {
-                if (api.ActionDescriptor.RouteValues.TryGetValue("controller", out var controller))
+                if (api.ActionDescriptor.RouteValues.TryGetValue("controller", out var controller)
+                    && !string.IsNullOrWhiteSpace(controller))
                 {
                     return [MapControllerTag(controller)];
                 }

@@ -15,7 +15,8 @@ namespace ProjectResourceManagement.Server.Controllers;
 public sealed class ManagerController(
     AllocationManagerService allocationManagerService,
     ProjectHealthService projectHealthService,
-    TimesheetService timesheetService) : ControllerBase
+    TimesheetService timesheetService,
+    TimesheetComplianceService timesheetComplianceService) : ControllerBase
 {
     [HttpGet("dashboard")]
     [RequirePermission(PermissionCodes.ManagerDashboardView)]
@@ -119,6 +120,32 @@ public sealed class ManagerController(
 
         var result = await timesheetService.GetManagerTeamTimesheetAsync(managerUserId, timesheetId, cancellationToken);
         return ToDetailActionResult(result);
+    }
+
+    [HttpGet("timesheets/frozen")]
+    [RequirePermission(PermissionCodes.ManagerTimesheetsFrozenList)]
+    public async Task<IActionResult> ListFrozenTimesheetEmployeesAsync(CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await timesheetComplianceService.ListFrozenTeamMembersAsync(managerUserId, cancellationToken);
+        return ToActionResult(result);
+    }
+
+    [HttpPut("timesheets/compliance/{employeeUserId:int}/restore")]
+    [RequirePermission(PermissionCodes.ManagerTimesheetsRestore)]
+    public async Task<IActionResult> RestoreTimesheetAccessAsync(int employeeUserId, CancellationToken cancellationToken)
+    {
+        if (!TryGetManagerUserId(out var managerUserId, out var errorResult))
+        {
+            return errorResult!;
+        }
+
+        var result = await timesheetComplianceService.RestoreTimesheetAccessAsync(managerUserId, employeeUserId, cancellationToken);
+        return ToActionResult(result);
     }
 
     private bool TryGetManagerUserId(out int managerUserId, out IActionResult? errorResult)
