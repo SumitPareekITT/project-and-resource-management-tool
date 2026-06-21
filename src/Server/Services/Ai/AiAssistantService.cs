@@ -19,7 +19,7 @@ public sealed class AiAssistantService(
     OrganizationTeamMatcher organizationTeamMatcher,
     ProjectRiskFactAssembler projectRiskFactAssembler,
     SkillMatchPromptBuilder skillMatchPromptBuilder,
-    ProjectRiskPromptBuilder projectRiskPromptBuilder,
+    ProjectRiskSummaryService projectRiskSummaryService,
     TeamMatchPromptBuilder teamMatchPromptBuilder,
     DeterministicSkillMatchSummarizer deterministicSkillMatchSummarizer,
     DeterministicProjectRiskSummarizer deterministicProjectRiskSummarizer,
@@ -160,8 +160,7 @@ public sealed class AiAssistantService(
         }
 
         var factLines = deterministicProjectRiskSummarizer.ToFactLines(facts);
-        var llmSettings = await llmConfigurationReader.ReadAsync(cancellationToken);
-        var summary = await BuildProjectRiskSummaryAsync(facts, llmSettings, cancellationToken);
+        var summary = await projectRiskSummaryService.SummarizeAsync(facts, cancellationToken);
 
         var response = new AiProjectRiskSummaryResponse(
             facts.ProjectId,
@@ -212,33 +211,6 @@ public sealed class AiAssistantService(
         {
             return new SummaryResult(
                 deterministicSkillMatchSummarizer.Summarize(query, candidates),
-                UsedFallback: true,
-                ProviderUsed: llmSettings.Provider);
-        }
-
-        return new SummaryResult(completion.Content, UsedFallback: false, ProviderUsed: llmSettings.Provider);
-    }
-
-    private async Task<SummaryResult> BuildProjectRiskSummaryAsync(
-        ProjectRiskFacts facts,
-        LlmSettings llmSettings,
-        CancellationToken cancellationToken)
-    {
-        var llmClient = llmCompletionClientFactory.Resolve(llmSettings);
-        if (llmClient is null)
-        {
-            return new SummaryResult(
-                $"{deterministicProjectRiskSummarizer.Summarize(facts)} LLM provider is not configured, so this summary uses system facts only.",
-                UsedFallback: true,
-                ProviderUsed: LlmProvider.None);
-        }
-
-        var prompt = projectRiskPromptBuilder.Build(facts);
-        var completion = await llmClient.CompleteAsync(prompt, llmSettings, cancellationToken);
-        if (!completion.Succeeded)
-        {
-            return new SummaryResult(
-                $"{deterministicProjectRiskSummarizer.Summarize(facts)} LLM error: {completion.ErrorMessage}",
                 UsedFallback: true,
                 ProviderUsed: llmSettings.Provider);
         }

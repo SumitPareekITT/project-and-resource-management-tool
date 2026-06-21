@@ -85,6 +85,9 @@ builder.Services.AddScoped<ITimesheetNotificationSender, LogTimesheetNotificatio
 builder.Services.AddScoped<TimesheetNotificationLogRepository>();
 builder.Services.AddScoped<UtilizationComputationService>();
 builder.Services.AddScoped<ProjectHealthService>();
+builder.Services.AddScoped<IProjectAtRiskNotificationService, ProjectAtRiskNotificationService>();
+builder.Services.AddScoped<ProjectAtRiskNotificationLogRepository>();
+builder.Services.AddScoped<ProjectRiskSummaryService>();
 builder.Services.AddHostedService<PrmBackgroundScheduler>();
 builder.Services.AddHttpClient(nameof(GeminiLlmCompletionClient));
 builder.Services.AddHttpClient(nameof(GroqLlmCompletionClient));

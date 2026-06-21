@@ -10,6 +10,7 @@ internal static class SchemaPatchRunner
 {
     private const string UserProfilesTable = "UserProfiles";
     private const string NotificationLogsTable = "TimesheetNotificationLogs";
+    private const string ProjectAtRiskNotificationLogsTable = "ProjectAtRiskNotificationLogs";
 
     private static readonly (string Column, string Definition)[] UserProfileColumnPatches =
     [
@@ -68,6 +69,27 @@ internal static class SchemaPatchRunner
                 """,
                 cancellationToken);
             logger.LogInformation("Schema patch: created table {Table}.", NotificationLogsTable);
+        }
+
+        if (!tableNames.Contains(ProjectAtRiskNotificationLogsTable))
+        {
+            await ExecuteAsync(
+                dbContext,
+                """
+                CREATE TABLE `ProjectAtRiskNotificationLogs` (
+                    `Id` INT NOT NULL AUTO_INCREMENT,
+                    `ProjectId` INT NOT NULL,
+                    `ManagerUserId` INT NOT NULL,
+                    `HealthStatus` VARCHAR(30) NOT NULL,
+                    `RecipientEmail` VARCHAR(200) NOT NULL,
+                    `Subject` VARCHAR(250) NOT NULL,
+                    `Body` VARCHAR(4000) NOT NULL,
+                    `SentAtUtc` DATETIME(6) NOT NULL,
+                    CONSTRAINT `PK_ProjectAtRiskNotificationLogs` PRIMARY KEY (`Id`)
+                )
+                """,
+                cancellationToken);
+            logger.LogInformation("Schema patch: created table {Table}.", ProjectAtRiskNotificationLogsTable);
         }
 
         if (patchedColumns > 0)

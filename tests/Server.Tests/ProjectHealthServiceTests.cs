@@ -185,7 +185,8 @@ dbContext.Allocations.Add(new Allocation
             new ProjectRepository(dbContext),
             new AllocationRepository(dbContext),
             new TimesheetRepository(dbContext),
-            new SystemConfigurationRepository(dbContext));
+            new SystemConfigurationRepository(dbContext),
+            NullProjectAtRiskNotificationService.Instance);
     }
 
     private static ApplicationDbContext CreateDbContext()
