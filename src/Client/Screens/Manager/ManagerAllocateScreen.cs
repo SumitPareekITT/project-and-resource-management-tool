@@ -47,12 +47,8 @@ internal static class ManagerAllocateScreen
         }
 
         Console.WriteLine();
-        Console.WriteLine("AI-MATCHED RESULTS");
+        Console.WriteLine("VERIFIED CANDIDATES (from your direct team)");
         Console.WriteLine(new string('─', 46));
-        Console.WriteLine(result.Summary);
-        Console.WriteLine($"Mode: {(result.UsedFallback ? "Fallback (no LLM)" : $"LLM ({result.ProviderUsed})")}");
-        Console.WriteLine();
-        Console.WriteLine("Note: Suggestions are AI-generated. Verify before confirming.");
 
         ConsoleTable.Print(
             ["#", "Emp ID", "Name", "Util %", "Score", "Matched Skills"],
@@ -72,6 +68,11 @@ internal static class ManagerAllocateScreen
         }
 
         Console.WriteLine();
+        Console.WriteLine("AI commentary (explanation only — allocate using the table above):");
+        Console.WriteLine(result.Summary);
+        Console.WriteLine($"Mode: {(result.UsedFallback ? "Fallback (no LLM)" : $"LLM ({result.ProviderUsed})")}");
+        Console.WriteLine();
+        Console.WriteLine("Note: Only verified candidates above can be selected.");
         Console.Write("Select employee # (0 to cancel): ");
         if (!int.TryParse(Console.ReadLine(), out var selection) || selection < 0 || selection > result.Candidates.Count)
         {

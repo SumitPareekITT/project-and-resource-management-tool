@@ -7,23 +7,26 @@ public sealed class SkillMatchPromptBuilder
 {
     public LlmCompletionRequest Build(string query, IReadOnlyList<SkillMatchCandidate> candidates)
     {
-        var candidateFacts = candidates
-            .Select(candidate =>
-                $"UserId={candidate.Profile.UserId}; Name={candidate.Profile.FullName}; " +
-                $"Department={candidate.Profile.Department}; Designation={candidate.Profile.Designation}; " +
-                $"Status={candidate.Profile.ResourceStatus}; Utilization={candidate.CurrentUtilizationPercent:0.##}%; " +
-                $"MatchScore={candidate.MatchScore}; Skills=[{string.Join(", ", candidate.MatchedSkills)}]")
-            .ToList();
-
         var systemInstruction =
-            "You are a resource planning assistant. Use only the candidate facts provided by the system. " +
-            "Do not invent employees or skills. Rank candidates for the manager query and explain each match briefly.";
+            "You are a resource planning assistant. You must ONLY discuss the exact candidates listed below. " +
+            "Never invent employees, user IDs, skills, or utilization values. " +
+            "Do not create markdown tables. Write 2-4 short sentences explaining why the listed people match the query.";
+
+        var candidateFacts = candidates.Count == 0
+            ? ["No candidates matched the manager query."]
+            : candidates
+                .Select((candidate, index) =>
+                    $"{index + 1}. UserId={candidate.Profile.UserId}; Name={candidate.Profile.FullName}; " +
+                    $"Department={candidate.Profile.Department}; Designation={candidate.Profile.Designation}; " +
+                    $"Status={candidate.Profile.ResourceStatus}; Utilization={candidate.CurrentUtilizationPercent:0.##}%; " +
+                    $"MatchScore={candidate.MatchScore}; Skills=[{string.Join(", ", candidate.MatchedSkills)}]")
+                .ToList();
 
         var userPrompt =
             $"Manager query: {query}\n\n" +
-            "Pre-filtered direct-team candidates:\n" +
+            "Verified direct-team candidates (use ONLY these people):\n" +
             string.Join("\n", candidateFacts) +
-            "\n\nReturn concise markdown with a ranked list and one-line explanation per employee.";
+            "\n\nIf the list is empty, say no matches were found. Otherwise explain the listed candidates briefly in plain text.";
 
         return new LlmCompletionRequest(systemInstruction, userPrompt);
     }

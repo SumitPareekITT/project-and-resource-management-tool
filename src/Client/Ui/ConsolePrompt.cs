@@ -1,5 +1,7 @@
 namespace ProjectResourceManagement.Client.Ui;
 
+using System.Text;
+
 /// <summary>
 /// Validated console input. Validation errors are shown inline; the next ShowHeader clears the screen.
 /// </summary>
@@ -18,6 +20,64 @@ internal static class ConsolePrompt
 
             ConsoleScreen.ShowValidationError($"{label} is required.");
         }
+    }
+
+    public static string ReadPassword(string label)
+    {
+        Console.Write($"{label}: ");
+        return ReadPasswordCharacters();
+    }
+
+    public static string ReadRequiredPassword(string label)
+    {
+        while (true)
+        {
+            Console.Write($"{label}: ");
+            var value = ReadPasswordCharacters();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+
+            ConsoleScreen.ShowValidationError($"{label} is required.");
+        }
+    }
+
+    private static string ReadPasswordCharacters()
+    {
+        var password = new StringBuilder();
+
+        while (true)
+        {
+            var keyInfo = Console.ReadKey(intercept: true);
+
+            if (keyInfo.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                break;
+            }
+
+            if (keyInfo.Key == ConsoleKey.Backspace)
+            {
+                if (password.Length > 0)
+                {
+                    password.Length--;
+                    Console.Write("\b \b");
+                }
+
+                continue;
+            }
+
+            if (char.IsControl(keyInfo.KeyChar))
+            {
+                continue;
+            }
+
+            password.Append(keyInfo.KeyChar);
+            Console.Write('*');
+        }
+
+        return password.ToString();
     }
 
     public static string ReadOptionalText(string label)

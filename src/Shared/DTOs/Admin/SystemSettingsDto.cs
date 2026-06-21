@@ -6,5 +6,7 @@ namespace ProjectResourceManagement.Shared.DTOs.Admin;
 public sealed record SystemSettingsDto(
     string LlmProvider,
     string MaskedLlmApiKey,
+    string LlmGemmaEndpoint,
+    string LlmGemmaModel,
     int SchedulerIntervalMinutes,
     int MaxWeeklyHours);

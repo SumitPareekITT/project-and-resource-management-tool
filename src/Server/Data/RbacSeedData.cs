@@ -54,6 +54,7 @@ public static class RbacSeedData
         new() { Id = 65, PermissionCode = PermissionCodes.ManagerTimesheetsView, Description = "View team timesheet", HttpMethod = "GET", RoutePattern = "/api/manager/timesheets/*" },
         new() { Id = 66, PermissionCode = PermissionCodes.ManagerAiSkillMatch, Description = "AI skill match", HttpMethod = "POST", RoutePattern = "/api/manager/ai/skill-match" },
         new() { Id = 67, PermissionCode = PermissionCodes.ManagerAiProjectRisk, Description = "AI project risk", HttpMethod = "POST", RoutePattern = "/api/manager/ai/project-risk-summary" },
+        new() { Id = 68, PermissionCode = PermissionCodes.ManagerAiTeamMatch, Description = "AI organization team match", HttpMethod = "POST", RoutePattern = "/api/manager/ai/team-match" },
 
         new() { Id = 70, PermissionCode = PermissionCodes.EmployeeTimesheetsSubmit, Description = "Submit timesheet", HttpMethod = "POST", RoutePattern = "/api/employee/timesheets" },
         new() { Id = 71, PermissionCode = PermissionCodes.EmployeeTimesheetsHistory, Description = "Timesheet history", HttpMethod = "GET", RoutePattern = "/api/employee/timesheets/history" },
@@ -66,7 +67,7 @@ public static class RbacSeedData
     public static IReadOnlyList<RolePermission> RolePermissions { get; } =
     [
         .. Permissions.Where(p => p.Id < 60).Select(p => new RolePermission { RoleId = 1, PermissionId = p.Id }),
-        .. Permissions.Where(p => p.Id is >= 60 and <= 67).Select(p => new RolePermission { RoleId = 2, PermissionId = p.Id }),
+        .. Permissions.Where(p => p.Id is >= 60 and <= 68).Select(p => new RolePermission { RoleId = 2, PermissionId = p.Id }),
         .. Permissions.Where(p => p.Id is >= 70 and <= 75).Select(p => new RolePermission { RoleId = 3, PermissionId = p.Id })
     ];
 

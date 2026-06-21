@@ -33,6 +33,20 @@ public static class SeedData
         new() { Id = 10, Name = "Documentation", Category = Shared.Enums.SkillCategory.Other }
     ];
 
+    public static IReadOnlyList<Skill> Skills { get; } =
+    [
+        new() { Id = 1, Name = "Java", Category = Shared.Enums.SkillCategory.Backend, IsActive = true },
+        new() { Id = 2, Name = "Spring Boot", Category = Shared.Enums.SkillCategory.Backend, IsActive = true },
+        new() { Id = 3, Name = "MySQL", Category = Shared.Enums.SkillCategory.Backend, IsActive = true },
+        new() { Id = 4, Name = "WebSocket", Category = Shared.Enums.SkillCategory.Backend, IsActive = true },
+        new() { Id = 5, Name = "Frontend Development", Category = Shared.Enums.SkillCategory.Frontend, IsActive = true },
+        new() { Id = 6, Name = "React", Category = Shared.Enums.SkillCategory.Frontend, IsActive = true },
+        new() { Id = 7, Name = "DevOps / Deployment", Category = Shared.Enums.SkillCategory.DevOps, IsActive = true },
+        new() { Id = 8, Name = "Kubernetes", Category = Shared.Enums.SkillCategory.DevOps, IsActive = true },
+        new() { Id = 9, Name = "Testing & QA", Category = Shared.Enums.SkillCategory.QA, IsActive = true },
+        new() { Id = 10, Name = "Documentation", Category = Shared.Enums.SkillCategory.Other, IsActive = true }
+    ];
+
     public static IReadOnlyList<SystemConfiguration> SystemConfigurations { get; } =
     [
         new()
@@ -56,7 +70,7 @@ public static class SeedData
             Id = 3,
             Key = "LlmProvider",
             Value = "None",
-            Description = "Configured AI provider. Expected values later: Gemini or Groq.",
+            Description = "Configured AI provider. Values: None, Gemini, Groq, Gemma.",
             UpdatedAtUtc = SeededAtUtc
         },
         new()
@@ -65,6 +79,22 @@ public static class SeedData
             Key = "LlmApiKey",
             Value = string.Empty,
             Description = "Encrypted or externally supplied LLM API key.",
+            UpdatedAtUtc = SeededAtUtc
+        },
+        new()
+        {
+            Id = 5,
+            Key = "LlmGemmaEndpoint",
+            Value = "http://164.52.211.238/api/generate",
+            Description = "Gemma server URL (POST /api/generate). API key is sent in the apikey header.",
+            UpdatedAtUtc = SeededAtUtc
+        },
+        new()
+        {
+            Id = 6,
+            Key = "LlmGemmaModel",
+            Value = "gemma3:12b-it-q8_0",
+            Description = "Gemma model name as registered in Ollama.",
             UpdatedAtUtc = SeededAtUtc
         }
     ];

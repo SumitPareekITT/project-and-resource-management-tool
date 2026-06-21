@@ -220,6 +220,57 @@ public sealed class UserProfileAdminService(
         return AdminResult<UserProfileSummaryDto>.Success(MapProfile(updated!));
     }
 
+    public async Task<AdminResult<UserProfileSummaryDto>> AddOrUpdateUserSkillByNameAsync(
+        int userId,
+        AddUserSkillByNameRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.SkillName))
+        {
+            return AdminResult<UserProfileSummaryDto>.Fail(AdminResultCode.ValidationError, "Skill name is required.");
+        }
+
+        if (request.YearsOfExperience is < 0)
+        {
+            return AdminResult<UserProfileSummaryDto>.Fail(AdminResultCode.ValidationError, "Years of experience cannot be negative.");
+        }
+
+        var profile = await userProfileRepository.GetByUserIdAsync(userId, cancellationToken);
+        if (profile is null)
+        {
+            return AdminResult<UserProfileSummaryDto>.Fail(AdminResultCode.NotFound, "Employee profile was not found for this user ID.");
+        }
+
+        var skill = await ResolveOrCreateSkillAsync(request.SkillName, request.Category, cancellationToken);
+        if (skill is null)
+        {
+            return AdminResult<UserProfileSummaryDto>.Fail(AdminResultCode.ValidationError, "Skill must exist and be active.");
+        }
+
+        var existing = profile.User.Skills.FirstOrDefault(skillLink => skillLink.SkillId == skill.Id);
+        if (existing is null)
+        {
+            profile.User.Skills.Add(new UserSkill
+            {
+                UserId = profile.UserId,
+                SkillId = skill.Id,
+                ProficiencyLevel = request.ProficiencyLevel,
+                YearsOfExperience = request.YearsOfExperience,
+                LastUsedOn = request.LastUsedOn
+            });
+        }
+        else
+        {
+            existing.ProficiencyLevel = request.ProficiencyLevel;
+            existing.YearsOfExperience = request.YearsOfExperience;
+            existing.LastUsedOn = request.LastUsedOn;
+        }
+
+        await userProfileRepository.SaveChangesAsync(cancellationToken);
+        var updated = await userProfileRepository.GetByIdAsync(profile.Id, cancellationToken);
+        return AdminResult<UserProfileSummaryDto>.Success(MapProfile(updated!));
+    }
+
     public async Task<AdminResult<UserProfileSummaryDto>> RemoveUserSkillAsync(
         int profileId,
         int skillId,
@@ -242,6 +293,30 @@ public sealed class UserProfileAdminService(
 
         var updated = await userProfileRepository.GetByIdAsync(profileId, cancellationToken);
         return AdminResult<UserProfileSummaryDto>.Success(MapProfile(updated!));
+    }
+
+    private async Task<Skill?> ResolveOrCreateSkillAsync(
+        string skillName,
+        SkillCategory category,
+        CancellationToken cancellationToken)
+    {
+        var normalizedName = skillName.Trim();
+        var existing = await skillRepository.GetByNameAsync(normalizedName, cancellationToken);
+        if (existing is not null)
+        {
+            return existing.IsActive ? existing : null;
+        }
+
+        var skill = new Skill
+        {
+            Name = normalizedName,
+            Category = category,
+            IsActive = true
+        };
+
+        await skillRepository.AddAsync(skill, cancellationToken);
+        await skillRepository.SaveChangesAsync(cancellationToken);
+        return skill;
     }
 
     private static AdminResult<UserProfileSummaryDto>? ValidateProfileFields(string fullName, string email, string department, string designation)

@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ProjectResourceManagement.Server.Services.Ai.Configuration;
 using ProjectResourceManagement.Shared.Enums;
 
 namespace ProjectResourceManagement.Server.Services.Ai.Clients;
@@ -14,12 +15,12 @@ public sealed class GroqLlmCompletionClient(IHttpClientFactory httpClientFactory
 
     public async Task<LlmCompletionResult> CompleteAsync(
         LlmCompletionRequest request,
-        string apiKey,
+        LlmSettings settings,
         CancellationToken cancellationToken = default)
     {
         var httpClient = httpClientFactory.CreateClient(nameof(GroqLlmCompletionClient));
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, Endpoint);
-        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
         httpRequest.Content = JsonContent.Create(new
         {
             model = ModelName,

@@ -4,5 +4,6 @@ public enum LlmProvider
 {
     None = 0,
     Gemini = 1,
-    Groq = 2
+    Groq = 2,
+    Gemma = 3
 }

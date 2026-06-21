@@ -17,7 +17,7 @@ internal static class AdminEmployeesScreen
                 new MenuItem("Create Profile", ScreenRunner.Wrap(() => CreateProfileAsync(client))),
                 new MenuItem("Update Profile", ScreenRunner.Wrap(() => UpdateProfileAsync(client))),
                 new MenuItem("Deactivate Profile", ScreenRunner.Wrap(() => DeactivateProfileAsync(client))),
-                new MenuItem("Manage Skills", () => ManageSkillsAsync(client)),
+                new MenuItem("Manage Employee Skills", ScreenRunner.Wrap(() => ManageSkillsAsync(client))),
                 new MenuItem("Assign Manager", ScreenRunner.Wrap(() => AssignManagerAsync(client))),
             ]);
     }
@@ -88,42 +88,202 @@ internal static class AdminEmployeesScreen
 
     private static async Task ManageSkillsAsync(HttpClient client)
     {
-        await MenuLoop.RunAsync("Manage Profile Skills", null, [
-            new MenuItem("Add / Update Skill", ScreenRunner.Wrap(() => UpsertSkillAsync(client))),
-            new MenuItem("Remove Skill", ScreenRunner.Wrap(() => RemoveSkillAsync(client))),
-        ]);
+        ConsoleScreen.ShowHeader("Manage Employee Skills");
+
+        var userId = ConsolePrompt.ReadRequiredInt("Enter Employee User ID");
+        var profile = await FetchProfileByUserIdAsync(client, userId);
+        if (profile is null)
+        {
+            ConsoleScreen.ShowError("No employee profile found for that user ID. Create a profile first.");
+            return;
+        }
+
+        while (true)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"── {profile.FullName} (User ID {profile.UserId}) ──");
+            if (profile.Skills.Count == 0)
+            {
+                Console.WriteLine("Current Skills: (none yet)");
+            }
+            else
+            {
+                Console.WriteLine("Current Skills:");
+                for (var index = 0; index < profile.Skills.Count; index++)
+                {
+                    var skill = profile.Skills[index];
+                    Console.WriteLine($"  {index + 1}.  {skill.SkillName,-22} {skill.ProficiencyLevel}");
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("1. Add Skill");
+            Console.WriteLine("2. Update Proficiency Level");
+            Console.WriteLine("3. Remove Skill");
+            Console.WriteLine("4. Back");
+            Console.Write("Enter option: ");
+            var choice = Console.ReadLine()?.Trim();
+
+            switch (choice)
+            {
+                case "1":
+                    profile = await AddSkillAsync(client, profile) ?? profile;
+                    break;
+                case "2":
+                    profile = await UpdateSkillProficiencyAsync(client, profile) ?? profile;
+                    break;
+                case "3":
+                    profile = await RemoveSkillFromProfileAsync(client, profile) ?? profile;
+                    break;
+                case "4":
+                    return;
+                default:
+                    ConsoleScreen.ShowError("Invalid option.");
+                    break;
+            }
+        }
     }
 
-    private static async Task UpsertSkillAsync(HttpClient client)
+    private static async Task<UserProfileSummaryDto?> AddSkillAsync(HttpClient client, UserProfileSummaryDto profile)
     {
-        ConsoleScreen.ShowHeader("Add / Update Skill");
-        var profileId = ConsolePrompt.ReadRequiredInt("Profile ID");
-        await ListAvailableSkillsAsync(client);
-        var skillId = ConsolePrompt.ReadRequiredInt("Skill ID");
-        var proficiency = ReadProficiencyLevel();
-        if (proficiency is null) return;
-        decimal? years = null;
-        Console.Write("Years of experience (blank to skip): ");
-        if (decimal.TryParse(Console.ReadLine(), out var parsedYears)) years = parsedYears;
-        DateOnly? lastUsed = null;
-        Console.Write("Last used yyyy-MM-dd (blank to skip): ");
-        var raw = Console.ReadLine();
-        if (!string.IsNullOrWhiteSpace(raw) && DateOnly.TryParse(raw, out var d)) lastUsed = d;
-        var response = await client.PostAsJsonAsync($"/api/user-profiles/{profileId}/skills",
-            new UpsertUserSkillRequest(skillId, proficiency.Value, years, lastUsed));
-        if (await ApiHelper.EnsureSuccessAsync(response)) ConsoleScreen.ShowSuccess("Skill saved.");
+        Console.WriteLine();
+        var skillName = ConsolePrompt.ReadRequiredText("Skill name");
+        var category = ReadSkillCategory();
+        if (category is null)
+        {
+            ConsoleScreen.ShowError("Invalid category choice.");
+            return null;
+        }
+
+        var proficiency = ReadRequiredProficiencyLevel();
+        if (proficiency is null)
+        {
+            ConsoleScreen.ShowError("Invalid proficiency choice.");
+            return null;
+        }
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/user-profiles/by-user/{profile.UserId}/skills",
+            new AddUserSkillByNameRequest(skillName, category.Value, proficiency.Value));
+
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return null;
+        }
+
+        ConsoleScreen.ShowSuccess("Skill added.");
+        return await FetchProfileByUserIdAsync(client, profile.UserId);
     }
 
-    private static async Task RemoveSkillAsync(HttpClient client)
+    private static async Task<UserProfileSummaryDto?> UpdateSkillProficiencyAsync(HttpClient client, UserProfileSummaryDto profile)
     {
-        ConsoleScreen.ShowHeader("Remove Skill");
-        var profileId = ConsolePrompt.ReadRequiredInt("Profile ID");
-        var profile = await FetchProfileAsync(client, profileId);
-        if (profile is null || profile.Skills.Count == 0) return;
+        if (profile.Skills.Count == 0)
+        {
+            ConsoleScreen.ShowInfo("This employee has no skills to update.");
+            return profile;
+        }
+
+        Console.WriteLine();
         PrintSkills(profile.Skills);
-        var skillId = ConsolePrompt.ReadRequiredInt("Skill ID to remove");
-        var response = await client.DeleteAsync($"/api/user-profiles/{profileId}/skills/{skillId}");
-        if (await ApiHelper.EnsureSuccessAsync(response)) ConsoleScreen.ShowSuccess("Skill removed.");
+        Console.Write("Enter skill number to update: ");
+        if (!int.TryParse(Console.ReadLine(), out var selected) || selected < 1 || selected > profile.Skills.Count)
+        {
+            ConsoleScreen.ShowError("Invalid skill number.");
+            return profile;
+        }
+
+        var skill = profile.Skills[selected - 1];
+        var proficiency = ReadRequiredProficiencyLevel();
+        if (proficiency is null)
+        {
+            return profile;
+        }
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/user-profiles/{profile.ProfileId}/skills",
+            new UpsertUserSkillRequest(skill.SkillId, proficiency.Value, skill.YearsOfExperience, skill.LastUsedOn));
+
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return profile;
+        }
+
+        ConsoleScreen.ShowSuccess("Proficiency updated.");
+        return await FetchProfileByUserIdAsync(client, profile.UserId);
+    }
+
+    private static async Task<UserProfileSummaryDto?> RemoveSkillFromProfileAsync(HttpClient client, UserProfileSummaryDto profile)
+    {
+        if (profile.Skills.Count == 0)
+        {
+            ConsoleScreen.ShowInfo("This employee has no skills to remove.");
+            return profile;
+        }
+
+        Console.WriteLine();
+        PrintSkills(profile.Skills);
+        Console.Write("Enter skill number to remove: ");
+        if (!int.TryParse(Console.ReadLine(), out var selected) || selected < 1 || selected > profile.Skills.Count)
+        {
+            ConsoleScreen.ShowError("Invalid skill number.");
+            return profile;
+        }
+
+        var skill = profile.Skills[selected - 1];
+        if (!ConsolePrompt.ReadYesNo($"Remove {skill.SkillName} from {profile.FullName}?"))
+        {
+            return profile;
+        }
+
+        var response = await client.DeleteAsync($"/api/user-profiles/{profile.ProfileId}/skills/{skill.SkillId}");
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return profile;
+        }
+
+        ConsoleScreen.ShowSuccess("Skill removed.");
+        return await FetchProfileByUserIdAsync(client, profile.UserId);
+    }
+
+    private static async Task<UserProfileSummaryDto?> FetchProfileByUserIdAsync(HttpClient client, int userId)
+    {
+        var response = await client.GetAsync("/api/user-profiles");
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return null;
+        }
+
+        var profiles = await ApiHelper.ReadAsync<List<UserProfileSummaryDto>>(response) ?? [];
+        return profiles.FirstOrDefault(p => p.UserId == userId);
+    }
+
+    private static SkillCategory? ReadSkillCategory()
+    {
+        Console.WriteLine("Category: (1) Backend  (2) Frontend  (3) DevOps  (4) QA  (5) Other");
+        Console.Write("Enter choice: ");
+        return Console.ReadLine()?.Trim() switch
+        {
+            "1" => SkillCategory.Backend,
+            "2" => SkillCategory.Frontend,
+            "3" => SkillCategory.DevOps,
+            "4" => SkillCategory.QA,
+            "5" => SkillCategory.Other,
+            _ => null
+        };
+    }
+
+    private static ProficiencyLevel? ReadRequiredProficiencyLevel()
+    {
+        Console.WriteLine("Proficiency: (1) Beginner  (2) Intermediate  (3) Advanced  (4) Expert");
+        Console.Write("Enter choice: ");
+        return Console.ReadLine()?.Trim() switch
+        {
+            "1" => ProficiencyLevel.Beginner,
+            "2" => ProficiencyLevel.Intermediate,
+            "3" => ProficiencyLevel.Advanced,
+            "4" => ProficiencyLevel.Expert,
+            _ => null
+        };
     }
 
     private static async Task AssignManagerAsync(HttpClient client)
@@ -147,20 +307,18 @@ internal static class AdminEmployeesScreen
         return profile;
     }
 
-    private static async Task ListAvailableSkillsAsync(HttpClient client)
-    {
-        var response = await client.GetAsync("/api/skills");
-        if (!await ApiHelper.EnsureSuccessAsync(response)) return;
-        var skills = await ApiHelper.ReadAsync<List<SkillDto>>(response) ?? [];
-        ConsoleTable.Print(["Skill ID", "Name", "Category", "Active"],
-            skills.Select(s => new[] { s.Id.ToString(), s.Name, s.Category.ToString(), ApiHelper.YesNo(s.IsActive) }));
-    }
-
     private static void PrintSkills(IReadOnlyList<UserSkillDto> skills)
     {
-        ConsoleTable.Print(["Skill", "Category", "Proficiency", "Years", "Last Used"],
-            skills.Select(s => new[] { s.SkillName, s.Category.ToString(), s.ProficiencyLevel.ToString(),
-                s.YearsOfExperience?.ToString("0.#") ?? "-", s.LastUsedOn?.ToString("yyyy-MM-dd") ?? "-" }));
+        ConsoleTable.Print(["#", "Skill", "Category", "Proficiency", "Years", "Last Used"],
+            skills.Select((s, index) => new[]
+            {
+                (index + 1).ToString(),
+                s.SkillName,
+                s.Category.ToString(),
+                s.ProficiencyLevel.ToString(),
+                s.YearsOfExperience?.ToString("0.#") ?? "-",
+                s.LastUsedOn?.ToString("yyyy-MM-dd") ?? "-"
+            }));
     }
 
     private static string ReadUpdatedText(string label, string current)
@@ -177,11 +335,5 @@ internal static class AdminEmployeesScreen
         if (string.IsNullOrWhiteSpace(raw)) return current;
         if (string.Equals(raw, "none", StringComparison.OrdinalIgnoreCase)) return null;
         return int.TryParse(raw, out var id) ? id : current;
-    }
-
-    private static ProficiencyLevel? ReadProficiencyLevel()
-    {
-        Console.Write("Proficiency (Beginner/Intermediate/Advanced/Expert): ");
-        return Enum.TryParse<ProficiencyLevel>(Console.ReadLine(), true, out var level) ? level : null;
     }
 }

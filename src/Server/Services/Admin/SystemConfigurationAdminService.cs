@@ -1,4 +1,5 @@
 using ProjectResourceManagement.Server.Data.Repositories;
+using ProjectResourceManagement.Server.Services.Ai.Clients;
 using ProjectResourceManagement.Shared.Constants;
 using ProjectResourceManagement.Shared.DTOs.Admin;
 using ProjectResourceManagement.Shared.Enums;
@@ -14,6 +15,8 @@ public sealed class SystemConfigurationAdminService(SystemConfigurationRepositor
     [
         "LlmProvider",
         "LlmApiKey",
+        "LlmGemmaEndpoint",
+        "LlmGemmaModel",
         "SchedulerIntervalMinutes",
         "MaxWeeklyHours"
     ];
@@ -22,12 +25,18 @@ public sealed class SystemConfigurationAdminService(SystemConfigurationRepositor
     {
         var provider = await ReadValueAsync("LlmProvider", cancellationToken) ?? "None";
         var apiKey = await ReadValueAsync("LlmApiKey", cancellationToken) ?? string.Empty;
+        var gemmaEndpoint = await ReadValueAsync("LlmGemmaEndpoint", cancellationToken)
+            ?? GemmaLlmCompletionClient.DefaultLocalEndpoint;
+        var gemmaModel = await ReadValueAsync("LlmGemmaModel", cancellationToken)
+            ?? GemmaLlmCompletionClient.DefaultModelName;
         var schedulerMinutes = await ReadIntAsync("SchedulerIntervalMinutes", BusinessRules.DefaultSchedulerIntervalMinutes, cancellationToken);
         var maxWeeklyHours = await ReadIntAsync("MaxWeeklyHours", BusinessRules.DefaultMaxWeeklyHours, cancellationToken);
 
         return AdminResult<SystemSettingsDto>.Success(new SystemSettingsDto(
             provider,
             MaskApiKey(apiKey),
+            gemmaEndpoint,
+            gemmaModel,
             schedulerMinutes,
             maxWeeklyHours));
     }
@@ -71,7 +80,11 @@ public sealed class SystemConfigurationAdminService(SystemConfigurationRepositor
         return key switch
         {
             "LlmProvider" when !Enum.TryParse<LlmProvider>(value, ignoreCase: true, out _)
-                => AdminResult<SystemSettingsDto>.Fail(AdminResultCode.ValidationError, "LlmProvider must be None, Gemini, or Groq."),
+                => AdminResult<SystemSettingsDto>.Fail(AdminResultCode.ValidationError, "LlmProvider must be None, Gemini, Groq, or Gemma."),
+            "LlmGemmaEndpoint" when !Uri.TryCreate(value, UriKind.Absolute, out _)
+                => AdminResult<SystemSettingsDto>.Fail(AdminResultCode.ValidationError, "LlmGemmaEndpoint must be a valid absolute URL."),
+            "LlmGemmaModel" when string.IsNullOrWhiteSpace(value)
+                => AdminResult<SystemSettingsDto>.Fail(AdminResultCode.ValidationError, "LlmGemmaModel cannot be empty."),
             "SchedulerIntervalMinutes" when !int.TryParse(value, out var minutes) || minutes <= 0
                 => AdminResult<SystemSettingsDto>.Fail(AdminResultCode.ValidationError, "Scheduler interval must be a positive number of minutes."),
             "MaxWeeklyHours" when !int.TryParse(value, out var hours) || hours <= 0

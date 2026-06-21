@@ -26,16 +26,15 @@ public sealed class AiPromptBuilderTests
                     CurrentUtilizationPercent = 40
                 },
                 MatchScore = 7,
+                HasQueryMatch = true,
                 MatchedSkills = ["Backend API Development (Advanced)"]
             }
         };
 
         var prompt = builder.Build("need backend api developer", candidates);
 
-        Assert.Contains("Pre-filtered direct-team candidates", prompt.UserPrompt);
-        Assert.Contains("UserId=10", prompt.UserPrompt);
-        Assert.Contains("Backend API Development", prompt.UserPrompt);
-        Assert.Contains("Do not invent employees", prompt.SystemInstruction);
+        Assert.Contains("Verified direct-team candidates", prompt.UserPrompt);
+        Assert.Contains("Never invent employees", prompt.SystemInstruction);
     }
 
     [Fact]

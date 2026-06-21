@@ -82,16 +82,24 @@ builder.Services.AddScoped<ProjectHealthService>();
 builder.Services.AddHostedService<PrmBackgroundScheduler>();
 builder.Services.AddHttpClient(nameof(GeminiLlmCompletionClient));
 builder.Services.AddHttpClient(nameof(GroqLlmCompletionClient));
+builder.Services.AddHttpClient(nameof(GemmaLlmCompletionClient), client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(3);
+});
 builder.Services.AddScoped<ILlmCompletionClient, GeminiLlmCompletionClient>();
 builder.Services.AddScoped<ILlmCompletionClient, GroqLlmCompletionClient>();
+builder.Services.AddScoped<ILlmCompletionClient, GemmaLlmCompletionClient>();
 builder.Services.AddScoped<LlmCompletionClientFactory>();
 builder.Services.AddScoped<LlmConfigurationReader>();
 builder.Services.AddScoped<SkillMatchCandidateFilter>();
+builder.Services.AddScoped<OrganizationTeamMatcher>();
 builder.Services.AddScoped<ProjectRiskFactAssembler>();
 builder.Services.AddScoped<SkillMatchPromptBuilder>();
 builder.Services.AddScoped<ProjectRiskPromptBuilder>();
+builder.Services.AddScoped<TeamMatchPromptBuilder>();
 builder.Services.AddScoped<DeterministicSkillMatchSummarizer>();
 builder.Services.AddScoped<DeterministicProjectRiskSummarizer>();
+builder.Services.AddScoped<DeterministicTeamMatchSummarizer>();
 builder.Services.AddScoped<AiAssistantService>();
 builder.Services.AddScoped<SystemConfigurationAdminService>();
 builder.Services.AddPrmSwagger();
@@ -107,12 +115,20 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseBootstrap");
 
     await DatabaseBootstrap.EnsureCurrentSchemaAsync(dbContext, configuration, environment, logger);
+    await RbacBootstrap.SyncMissingSeedDataAsync(dbContext, logger);
 
     var adminUser = await dbContext.Users.FirstOrDefaultAsync(user => user.Username == "admin");
     if (adminUser is not null && adminUser.PasswordHash == "CHANGE_ME_WITH_PASSWORD_HASHER")
     {
         adminUser.PasswordHash = passwordHasher.Hash("Admin@1234");
         await dbContext.SaveChangesAsync();
+    }
+
+    if (!await dbContext.Skills.AnyAsync())
+    {
+        await dbContext.Skills.AddRangeAsync(SeedData.Skills);
+        await dbContext.SaveChangesAsync();
+        logger.LogInformation("Seeded {Count} skills into empty skills catalog.", SeedData.Skills.Count);
     }
 }
 

@@ -33,7 +33,6 @@ public sealed class DeterministicProjectRiskSummarizer
             lines.Add($"Nearest milestone context: {facts.MilestoneLines[0]}");
         }
 
-        lines.Add("LLM provider is not configured, so this summary uses system facts only.");
         return string.Join(" ", lines);
     }
 
