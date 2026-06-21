@@ -11,7 +11,8 @@ public sealed class ProjectHealthService(
     ProjectRepository projectRepository,
     AllocationRepository allocationRepository,
     TimesheetRepository timesheetRepository,
-    SystemConfigurationRepository systemConfigurationRepository)
+    SystemConfigurationRepository systemConfigurationRepository,
+    IProjectAtRiskNotificationService atRiskNotificationService)
 {
     public async Task<int> EvaluateAndPersistAllProjectsAsync(CancellationToken cancellationToken = default)
     {
@@ -21,8 +22,14 @@ public sealed class ProjectHealthService(
 
         foreach (var project in projects)
         {
+            var previousStatus = project.HealthStatus;
             var evaluation = await EvaluateProjectAsync(project, maxWeeklyHours, previousWeekStart, cancellationToken);
             project.HealthStatus = evaluation.HealthStatus;
+            await atRiskNotificationService.TryNotifyIfNewlyAtRiskAsync(
+                project,
+                previousStatus,
+                evaluation,
+                cancellationToken);
         }
 
         await projectRepository.SaveChangesAsync(cancellationToken);
@@ -313,7 +320,7 @@ public sealed class ProjectHealthService(
         return from1 <= to2 && from2 <= end1;
     }
 
-    internal sealed record ProjectHealthEvaluation(
+    public sealed record ProjectHealthEvaluation(
         ProjectHealthStatus HealthStatus,
         IReadOnlyList<string> Signals,
         int ActiveAllocationCount,

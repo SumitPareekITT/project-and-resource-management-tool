@@ -253,7 +253,11 @@ dbContext.UserSkills.Add(new UserSkill
                 new TimesheetRepository(dbContext),
                 new SystemConfigurationRepository(dbContext)),
             new SkillMatchPromptBuilder(),
-            new ProjectRiskPromptBuilder(),
+            new ProjectRiskSummaryService(
+                new DeterministicProjectRiskSummarizer(),
+                new ProjectRiskPromptBuilder(),
+                new LlmConfigurationReader(new SystemConfigurationRepository(dbContext)),
+                new LlmCompletionClientFactory(clients)),
             new TeamMatchPromptBuilder(),
             new DeterministicSkillMatchSummarizer(),
             new DeterministicProjectRiskSummarizer(),

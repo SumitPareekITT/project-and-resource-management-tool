@@ -21,6 +21,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<ActivityTag> ActivityTags => Set<ActivityTag>();
     public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
     public DbSet<TimesheetNotificationLog> TimesheetNotificationLogs => Set<TimesheetNotificationLog>();
+    public DbSet<ProjectAtRiskNotificationLog> ProjectAtRiskNotificationLogs => Set<ProjectAtRiskNotificationLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         ConfigureTimesheets(modelBuilder);
         ConfigureSystemConfiguration(modelBuilder);
         ConfigureTimesheetNotifications(modelBuilder);
+        ConfigureProjectAtRiskNotifications(modelBuilder);
         Seed(modelBuilder);
     }
 
@@ -214,6 +216,17 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             entity.Property(log => log.Subject).HasMaxLength(250).IsRequired();
             entity.Property(log => log.Body).HasMaxLength(4000).IsRequired();
             entity.Property(log => log.NotificationType).HasConversion<string>().HasMaxLength(30);
+        });
+    }
+
+    private static void ConfigureProjectAtRiskNotifications(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProjectAtRiskNotificationLog>(entity =>
+        {
+            entity.Property(log => log.RecipientEmail).HasMaxLength(200).IsRequired();
+            entity.Property(log => log.Subject).HasMaxLength(250).IsRequired();
+            entity.Property(log => log.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(log => log.HealthStatus).HasConversion<string>().HasMaxLength(30);
         });
     }
 
