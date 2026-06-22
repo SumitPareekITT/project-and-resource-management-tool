@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using ProjectResourceManagement.Client.Ui;
 using ProjectResourceManagement.Shared.DTOs.Timesheet;
 
@@ -10,6 +11,17 @@ internal static class ManagerTimesheetsScreen
 {
     public static async Task RunAsync(HttpClient client)
     {
+        await MenuLoop.RunAsync(
+            "Team Timesheets",
+            "View submissions, missing weeks, and restore frozen access",
+            [
+                new MenuItem("View Team Timesheets (by week)", ScreenRunner.Wrap(() => ViewByWeekAsync(client))),
+                new MenuItem("Restore Frozen Timesheet Access", ScreenRunner.Wrap(() => RestoreFrozenAccessAsync(client))),
+            ]);
+    }
+
+    private static async Task ViewByWeekAsync(HttpClient client)
+    {
         ConsoleScreen.ShowHeader("Timesheets — My Team");
 
         var defaultWeek = WeekHelper.GetDefaultTimesheetWeekStart();
@@ -17,6 +29,55 @@ internal static class ManagerTimesheetsScreen
 
         await ShowMissingTimesheetsAsync(client, weekStart);
         await ShowSubmittedTimesheetsAsync(client, weekStart);
+    }
+
+    private static async Task RestoreFrozenAccessAsync(HttpClient client)
+    {
+        ConsoleScreen.ShowHeader("Restore Frozen Timesheet Access");
+
+        var response = await client.GetAsync("/api/manager/timesheets/frozen");
+        if (!await ApiHelper.EnsureSuccessAsync(response))
+        {
+            return;
+        }
+
+        var frozenEmployees = await ApiHelper.ReadAsync<List<FrozenTimesheetEmployeeDto>>(response) ?? [];
+        if (frozenEmployees.Count == 0)
+        {
+            ConsoleScreen.ShowInfo("No employees on your team have frozen timesheet access.");
+            return;
+        }
+
+        ConsoleTable.Print(
+            ["#", "User ID", "Employee", "Missing Week", "Reminders", "Frozen At"],
+            frozenEmployees.Select((item, index) => new[]
+            {
+                (index + 1).ToString(),
+                item.UserId.ToString(),
+                item.FullName,
+                item.MissingWeekStartDate?.ToString("yyyy-MM-dd") ?? "-",
+                item.ReminderCount.ToString(),
+                item.FrozenAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "-"
+            }));
+
+        Console.Write("Enter employee number to restore: ");
+        if (!int.TryParse(Console.ReadLine(), out var selected) || selected < 1 || selected > frozenEmployees.Count)
+        {
+            ConsoleScreen.ShowError("Invalid selection.");
+            return;
+        }
+
+        var employee = frozenEmployees[selected - 1];
+        if (!ConsolePrompt.ReadYesNo($"Restore timesheet access for {employee.FullName}?"))
+        {
+            return;
+        }
+
+        var restoreResponse = await client.PutAsync($"/api/manager/timesheets/compliance/{employee.UserId}/restore", null);
+        if (await ApiHelper.EnsureSuccessAsync(restoreResponse))
+        {
+            ConsoleScreen.ShowSuccess($"{employee.FullName} can submit timesheets again.");
+        }
     }
 
     private static async Task ShowMissingTimesheetsAsync(HttpClient client, DateOnly weekStart)
@@ -40,13 +101,15 @@ internal static class ManagerTimesheetsScreen
         }
 
         ConsoleTable.Print(
-            ["User ID", "Employee", "Email", "Missing Week"],
+            ["User ID", "Employee", "Email", "Missing Week", "Reminders", "Frozen"],
             reminders.Select(item => new[]
             {
                 item.UserId.ToString(),
                 item.UserName,
                 item.Email,
-                item.WeekStartDate.ToString("yyyy-MM-dd")
+                item.WeekStartDate.ToString("yyyy-MM-dd"),
+                item.ReminderCount.ToString(),
+                ApiHelper.YesNo(item.IsTimesheetSubmissionFrozen)
             }));
     }
 

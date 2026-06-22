@@ -16,6 +16,7 @@ using ProjectResourceManagement.Server.Services.Ai.Facts;
 using ProjectResourceManagement.Server.Services.Ai.Filtering;
 using ProjectResourceManagement.Server.Services.Ai.Fallback;
 using ProjectResourceManagement.Server.Services.Ai.Prompts;
+using ProjectResourceManagement.Server.Services.Email;
 using ProjectResourceManagement.Server.Services.Scheduling;
 using ProjectResourceManagement.Server.Services.Timesheets;
 using ProjectResourceManagement.Server.Swagger;
@@ -33,6 +34,8 @@ if (string.IsNullOrWhiteSpace(jwtSettings.Secret) || jwtSettings.Secret.Length <
 }
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection(SmtpSettings.SectionName));
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -77,6 +80,9 @@ builder.Services.AddScoped<SkillAdminService>();
 builder.Services.AddScoped<ProjectAdminService>();
 builder.Services.AddScoped<AllocationManagerService>();
 builder.Services.AddScoped<TimesheetService>();
+builder.Services.AddScoped<TimesheetComplianceService>();
+builder.Services.AddScoped<ITimesheetNotificationSender, LogTimesheetNotificationSender>();
+builder.Services.AddScoped<TimesheetNotificationLogRepository>();
 builder.Services.AddScoped<UtilizationComputationService>();
 builder.Services.AddScoped<ProjectHealthService>();
 builder.Services.AddHostedService<PrmBackgroundScheduler>();
@@ -105,6 +111,23 @@ builder.Services.AddScoped<SystemConfigurationAdminService>();
 builder.Services.AddPrmSwagger();
 
 var app = builder.Build();
+
+var smtpSettings = app.Configuration.GetSection(SmtpSettings.SectionName).Get<SmtpSettings>();
+var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+if (smtpSettings?.IsConfigured == true)
+{
+    startupLogger.LogInformation(
+        "SMTP email is enabled. Host={Host}, Port={Port}, From={FromAddress}",
+        smtpSettings.Host,
+        smtpSettings.Port,
+        smtpSettings.FromAddress);
+}
+else
+{
+    startupLogger.LogWarning(
+        "SMTP email is NOT configured. Timesheet notifications will be logged to the database only. " +
+        "Set Smtp:Enabled=true with Host and FromAddress in appsettings.json.");
+}
 
 using (var scope = app.Services.CreateScope())
 {

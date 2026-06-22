@@ -20,6 +20,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
     public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
     public DbSet<ActivityTag> ActivityTags => Set<ActivityTag>();
     public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
+    public DbSet<TimesheetNotificationLog> TimesheetNotificationLogs => Set<TimesheetNotificationLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +34,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         ConfigureAllocations(modelBuilder);
         ConfigureTimesheets(modelBuilder);
         ConfigureSystemConfiguration(modelBuilder);
+        ConfigureTimesheetNotifications(modelBuilder);
         Seed(modelBuilder);
     }
 
@@ -200,6 +202,18 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
             entity.Property(configuration => configuration.Key).HasMaxLength(100).IsRequired();
             entity.Property(configuration => configuration.Value).HasMaxLength(1000);
             entity.Property(configuration => configuration.Description).HasMaxLength(500);
+        });
+    }
+
+    private static void ConfigureTimesheetNotifications(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<TimesheetNotificationLog>(entity =>
+        {
+            entity.Property(log => log.RecipientEmail).HasMaxLength(200).IsRequired();
+            entity.Property(log => log.RecipientRole).HasMaxLength(50).IsRequired();
+            entity.Property(log => log.Subject).HasMaxLength(250).IsRequired();
+            entity.Property(log => log.Body).HasMaxLength(4000).IsRequired();
+            entity.Property(log => log.NotificationType).HasConversion<string>().HasMaxLength(30);
         });
     }
 

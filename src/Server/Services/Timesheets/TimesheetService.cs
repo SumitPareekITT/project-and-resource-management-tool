@@ -56,6 +56,13 @@ public sealed class TimesheetService(
             return AdminResult<TimesheetDetailDto>.Fail(AdminResultCode.NotFound, "User profile was not found or is inactive.");
         }
 
+        if (profile.IsTimesheetSubmissionFrozen)
+        {
+            return AdminResult<TimesheetDetailDto>.Fail(
+                AdminResultCode.ValidationError,
+                "Timesheet submission is frozen due to missed submissions after reminders. Contact your manager to restore access.");
+        }
+
         var weekStart = NormalizeWeekStart(request.WeekStartDate);
         if (weekStart != request.WeekStartDate)
         {
@@ -142,6 +149,17 @@ public sealed class TimesheetService(
         }
 
         await timesheetRepository.AddAsync(timesheet, cancellationToken);
+
+        if (profile.TimesheetComplianceMissingWeek == weekStart || profile.IsTimesheetSubmissionFrozen)
+        {
+            profile.IsTimesheetSubmissionFrozen = false;
+            profile.TimesheetFrozenAtUtc = null;
+            profile.TimesheetComplianceMissingWeek = null;
+            profile.TimesheetReminderCount = 0;
+            profile.LastTimesheetReminderSentOn = null;
+            await userProfileRepository.SaveChangesAsync(cancellationToken);
+        }
+
         await timesheetRepository.SaveChangesAsync(cancellationToken);
 
         var created = await timesheetRepository.GetByIdAsync(timesheet.Id, cancellationToken);
@@ -246,7 +264,13 @@ public sealed class TimesheetService(
             var exists = await timesheetRepository.ExistsForUserWeekAsync(profile.UserId, targetWeek, cancellationToken);
             if (!exists)
             {
-                reminders.Add(new MissingTimesheetReminderDto(profile.UserId, profile.FullName, profile.Email, targetWeek));
+                reminders.Add(new MissingTimesheetReminderDto(
+                    profile.UserId,
+                    profile.FullName,
+                    profile.Email,
+                    targetWeek,
+                    profile.TimesheetComplianceMissingWeek == targetWeek ? profile.TimesheetReminderCount : 0,
+                    profile.IsTimesheetSubmissionFrozen && profile.TimesheetComplianceMissingWeek == targetWeek));
             }
         }
 
@@ -268,7 +292,7 @@ public sealed class TimesheetService(
         int userId,
         CancellationToken cancellationToken = default)
     {
-        if (await GetProfileByUserIdAsync(userId, cancellationToken) is null)
+        if (await GetProfileByUserIdAsync(userId, cancellationToken) is not { } profile)
         {
             return AdminResult<EmployeeTimesheetReminderDto>.Fail(AdminResultCode.NotFound, "User profile was not found.");
         }
@@ -276,8 +300,30 @@ public sealed class TimesheetService(
         var previousWeek = NormalizeWeekStart(DateOnly.FromDateTime(DateTime.UtcNow)).AddDays(-7);
         var exists = await timesheetRepository.ExistsForUserWeekAsync(userId, previousWeek, cancellationToken);
 
+        string? message = null;
+        if (profile.IsTimesheetSubmissionFrozen)
+        {
+            message = profile.TimesheetComplianceMissingWeek is null
+                ? "Timesheet submission is frozen. Contact your manager to restore access."
+                : $"Timesheet submission is frozen for week {profile.TimesheetComplianceMissingWeek:yyyy-MM-dd}. Contact your manager to restore access.";
+        }
+        else if (!exists)
+        {
+            message = profile.TimesheetReminderCount switch
+            {
+                >= 2 => $"Final reminder: submit timesheet for week {previousWeek:yyyy-MM-dd} today to avoid access freeze.",
+                1 => $"Reminder: submit timesheet for week {previousWeek:yyyy-MM-dd}.",
+                _ => $"Reminder: Timesheet for week {previousWeek:yyyy-MM-dd} has not been submitted."
+            };
+        }
+
         return AdminResult<EmployeeTimesheetReminderDto>.Success(
-            new EmployeeTimesheetReminderDto(!exists, exists ? null : previousWeek));
+            new EmployeeTimesheetReminderDto(
+                !exists,
+                exists ? null : previousWeek,
+                profile.IsTimesheetSubmissionFrozen,
+                profile.TimesheetComplianceMissingWeek == previousWeek ? profile.TimesheetReminderCount : 0,
+                message));
     }
 
     private Task<UserProfile?> GetProfileByUserIdAsync(int userId, CancellationToken cancellationToken)

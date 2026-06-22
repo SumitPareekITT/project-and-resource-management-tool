@@ -76,6 +76,19 @@ public sealed class UserProfileRepository(ApplicationDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<UserProfile>> ListActiveEmployeesAsync(CancellationToken cancellationToken = default)
+    {
+        return dbContext.UserProfiles
+            .Include(profile => profile.User)
+            .ThenInclude(user => user.RoleAssignments)
+            .ThenInclude(assignment => assignment.Role)
+            .Where(profile => profile.IsActive)
+            .Where(profile => profile.User.RoleAssignments.Any(assignment =>
+                assignment.Role.RoleName == nameof(Shared.Enums.UserRole.Employee)))
+            .OrderBy(profile => profile.FullName)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<List<UserProfile>> ListByManagerUserIdAsync(int managerUserId, CancellationToken cancellationToken = default)
     {
         return dbContext.UserProfiles
